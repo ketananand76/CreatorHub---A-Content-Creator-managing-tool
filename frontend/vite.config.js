@@ -9,7 +9,19 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:5000',
+        target: (() => {
+          const t = process.env.VITE_API_TARGET || process.env.VITE_API_URL;
+          if (!t) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              '[vite proxy] Missing VITE_API_TARGET/VITE_API_URL. ' +
+              'Falling back to http://127.0.0.1:5000. ' +
+              'This will break in production deploys.'
+            );
+            return 'http://127.0.0.1:5000';
+          }
+          return t;
+        })(),
         changeOrigin: true,
         secure: false,
       },
