@@ -64,17 +64,6 @@ export default function Register() {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-[#070b14] px-4 relative overflow-hidden">
-      {/* Admin Login (top-right) */}
-      <div className="absolute top-5 right-5 z-20">
-        <button
-          type="button"
-          onClick={() => navigate('/admin-login')}
-          className="px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-[#161a36]/50 hover:bg-white dark:hover:bg-[#161a36]/80 transition-colors text-slate-700 dark:text-slate-200"
-        >
-          Admin Login
-        </button>
-      </div>
-
       {/* Background Neon glows */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand-500/10 rounded-full blur-[120px] pointer-events-none animate-pulse-slow"></div>
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none animate-pulse-slow"></div>
