@@ -1,0 +1,35 @@
+[
+  {
+    "_id": "zlvxuhke0y0trkc9u87aya",
+    "createdAt": "2026-07-05T05:30:05.849Z",
+    "updatedAt": "2026-07-05T05:30:05.849Z",
+    "userId": "asds1imzyjmtcihaq422k",
+    "email": "ketanpaswan53@gmail.com",
+    "ipAddress": "::1",
+    "device": "Desktop",
+    "browser": "Safari",
+    "action": "Login"
+  },
+  {
+    "_id": "8a3mz6fquk5cdzjfr2i8lv",
+    "createdAt": "2026-07-05T05:31:12.951Z",
+    "updatedAt": "2026-07-05T05:31:12.951Z",
+    "userId": "tvbyzrmk6vrcq93mk3co",
+    "email": "ketanpaswan@gmail.com",
+    "ipAddress": "::1",
+    "device": "Desktop",
+    "browser": "Safari",
+    "action": "Login"
+  },
+  {
+    "_id": "ooqhhp0y9cqsbdzbj9dlme",
+    "createdAt": "2026-07-05T05:34:10.744Z",
+    "updatedAt": "2026-07-05T05:34:10.744Z",
+    "userId": "asds1imzyjmtcihaq422k",
+    "email": "ketanpaswan53@gmail.com",
+    "ipAddress": "::1",
+    "device": "Desktop",
+    "browser": "Safari",
+    "action": "Login"
+  }
+]

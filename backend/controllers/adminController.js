@@ -1,0 +1,458 @@
+import { User, Transaction, SessionLog, Ticket, IncomeExpense, SystemSettings, BrandDeal, TeamTask, CalendarEvent } from '../models/db.js';
+
+// --- USER-FACING ENDPOINTS ---
+
+export const submitTransaction = async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+    const { amount, utr, screenshotUrl } = req.body;
+
+    if (!amount || !utr) {
+      return res.status(400).json({ success: false, message: 'Amount and Transaction UTR are required' });
+    }
+
+    // Check if UTR is already submitted
+    const existing = await Transaction.findOne({ utr });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'This Transaction UTR reference has already been submitted.' });
+    }
+
+    const transaction = await Transaction.create({
+      userId,
+      userEmail: req.user.email,
+      amount: Number(amount),
+      upiId: '9771735011@mbk',
+      utr,
+      screenshotUrl: screenshotUrl || '',
+      status: 'pending'
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Payment verification request submitted successfully. The Super Admin will review and activate your subscription.',
+      transaction
+    });
+  } catch (error) {
+    console.error('Submit Transaction Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const getMyTransactions = async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+    const transactions = await Transaction.find({ userId });
+    res.status(200).json({ success: true, transactions });
+  } catch (error) {
+    console.error('Get My Transactions Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const submitTicket = async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+    const { subject, message } = req.body;
+
+    if (!subject || !message) {
+      return res.status(400).json({ success: false, message: 'Subject and message are required' });
+    }
+
+    const ticket = await Ticket.create({
+      userId,
+      userEmail: req.user.email,
+      subject,
+      message,
+      status: 'open'
+    });
+
+    res.status(201).json({ success: true, ticket });
+  } catch (error) {
+    console.error('Submit Ticket Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const getMyTickets = async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+    const tickets = await Ticket.find({ userId });
+    res.status(200).json({ success: true, tickets });
+  } catch (error) {
+    console.error('Get My Tickets Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+
+// --- SUPER ADMIN / ADMIN ENDPOINTS ---
+
+export const getAdminStats = async (req, res) => {
+  try {
+    const users = await User.find({});
+    const transactions = await Transaction.find({});
+    const tickets = await Ticket.find({});
+
+    const totalUsers = users.length;
+    const activeUsers = users.filter(u => u.status === 'active').length;
+    const premiumUsers = users.filter(u => u.isPremium).length;
+
+    // Calculate revenue based on APPROVED UPI payments
+    const approvedTransactions = transactions.filter(t => t.status === 'approved');
+    const totalEarning = approvedTransactions.reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+
+    // Support ticket stats
+    const openTickets = tickets.filter(t => t.status === 'open').length;
+
+    res.status(200).json({
+      success: true,
+      stats: {
+        totalUsers,
+        activeUsers,
+        premiumUsers,
+        totalRevenue: totalEarning,
+        openTickets,
+        pendingTransactions: transactions.filter(t => t.status === 'pending').length
+      }
+    });
+  } catch (error) {
+    console.error('Get Admin Stats Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const getUsersList = async (req, res) => {
+  try {
+    const users = await User.find({});
+    // Remove passwords before returning
+    const cleanUsers = users.map(u => ({
+      id: u._id || u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      status: u.status,
+      isPremium: u.isPremium,
+      premiumExpires: u.premiumExpires,
+      isTwoFAEnabled: u.isTwoFAEnabled,
+      createdAt: u.createdAt
+    }));
+    res.status(200).json({ success: true, users: cleanUsers });
+  } catch (error) {
+    console.error('Get Users List Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const updateUserStatus = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { status } = req.body; // active, suspended, banned
+
+    if (!['active', 'suspended', 'banned'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status value' });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(userId, { status }, { new: true });
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.status(200).json({ success: true, message: `User status updated to ${status}`, user: updatedUser });
+  } catch (error) {
+    console.error('Update User Status Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const deleteUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const deleted = await User.deleteOne({ _id: userId });
+    if (deleted.deletedCount === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    res.status(200).json({ success: true, message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Delete User Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const getPaymentLogs = async (req, res) => {
+  try {
+    const transactions = await Transaction.find({});
+    // Sort transactions by pending first, then by date descending
+    const sorted = transactions.sort((a, b) => {
+      if (a.status === 'pending' && b.status !== 'pending') return -1;
+      if (a.status !== 'pending' && b.status === 'pending') return 1;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+    res.status(200).json({ success: true, logs: sorted });
+  } catch (error) {
+    console.error('Get Payment Logs Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const approveTransaction = async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+
+    const tx = await Transaction.findById(transactionId);
+    if (!tx) {
+      return res.status(404).json({ success: false, message: 'Transaction not found' });
+    }
+
+    if (tx.status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Transaction is already processed' });
+    }
+
+    // Approve transaction
+    await Transaction.findByIdAndUpdate(transactionId, { status: 'approved' });
+
+    // Activate premium for the paying user
+    const oneYear = new Date();
+    oneYear.setFullYear(oneYear.getFullYear() + 1);
+
+    await User.findByIdAndUpdate(tx.userId, {
+      isPremium: true,
+      premiumExpires: oneYear.toISOString()
+    });
+
+    // Automatically log this as income in the earnings tracker for admin stats, or for the platform!
+    // Since payment goes to CreatorHub platform, Super Admin records total earnings.
+    res.status(200).json({
+      success: true,
+      message: 'Transaction approved. Premium subscription activated for the user.'
+    });
+  } catch (error) {
+    console.error('Approve Transaction Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const rejectTransaction = async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+
+    const tx = await Transaction.findById(transactionId);
+    if (!tx) {
+      return res.status(404).json({ success: false, message: 'Transaction not found' });
+    }
+
+    if (tx.status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Transaction already processed' });
+    }
+
+    await Transaction.findByIdAndUpdate(transactionId, { status: 'rejected' });
+
+    res.status(200).json({
+      success: true,
+      message: 'Transaction rejected successfully.'
+    });
+  } catch (error) {
+    console.error('Reject Transaction Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const getSessionHistory = async (req, res) => {
+  try {
+    const logs = await SessionLog.find({});
+    // Return sorted descending
+    const sortedLogs = logs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.status(200).json({ success: true, logs: sortedLogs });
+  } catch (error) {
+    console.error('Get Session History Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const getAllTickets = async (req, res) => {
+  try {
+    const tickets = await Ticket.find({});
+    res.status(200).json({ success: true, tickets });
+  } catch (error) {
+    console.error('Get Tickets Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const replyTicket = async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const { reply } = req.body;
+
+    if (!reply) {
+      return res.status(400).json({ success: false, message: 'Reply text is required' });
+    }
+
+    const ticket = await Ticket.findById(ticketId);
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    await Ticket.findByIdAndUpdate(ticketId, {
+      reply,
+      status: 'resolved'
+    });
+
+    res.status(200).json({ success: true, message: 'Ticket resolved and reply sent.' });
+  } catch (error) {
+    console.error('Reply Ticket Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const getAdsenseSettings = async (req, res) => {
+  try {
+    const setting = await SystemSettings.findOne({ key: 'adsense_code' });
+    const fallbackAdCode = `
+      <div style="width:100%;max-width:320px;margin:0 auto;padding:14px;border:1px solid #e2e8f0;border-radius:14px;background:linear-gradient(135deg,#0f172a,#1d4ed8);color:#fff;text-align:center;font-family:system-ui,Segoe UI,sans-serif;box-shadow:0 8px 24px rgba(15,23,42,0.14);">
+        <div style="font-size:10px;letter-spacing:0.24em;text-transform:uppercase;opacity:0.8;">Sponsored</div>
+        <div style="font-size:14px;font-weight:700;margin-top:6px;">Live ad space is ready</div>
+        <div style="font-size:12px;opacity:0.95;margin-top:4px;">Add your AdSense or custom HTML in the admin panel to replace this placeholder.</div>
+      </div>
+    `;
+    const adCode = (setting && setting.value && setting.value.trim()) ? setting.value : fallbackAdCode;
+    res.status(200).json({ success: true, adCode });
+  } catch (error) {
+    console.error('Get Adsense Settings Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const updateAdsenseSettings = async (req, res) => {
+  try {
+    const { adCode } = req.body;
+    let setting = await SystemSettings.findOne({ key: 'adsense_code' });
+    if (setting) {
+      const targetId = setting._id || setting.id;
+      setting = await SystemSettings.findByIdAndUpdate(targetId, { value: adCode }, { new: true });
+    } else {
+      setting = await SystemSettings.create({ key: 'adsense_code', value: adCode });
+    }
+    res.status(200).json({ success: true, message: 'Google AdSense settings updated successfully.', adCode: setting.value });
+  } catch (error) {
+    console.error('Update Adsense Settings Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const getCreatorPerformanceData = async () => {
+  const creators = await User.find({ role: 'Creator' });
+  const performanceList = [];
+
+  for (const c of creators) {
+    const creatorId = c._id || c.id;
+
+    // Brand sponsorships
+    const deals = await BrandDeal.find({ creatorId });
+    const totalDealsValue = deals
+      .filter(d => ['Completed', 'Contract Signed', 'Payment Pending'].includes(d.stage))
+      .reduce((sum, d) => sum + (Number(d.dealValue) || 0), 0);
+
+    // Completed tasks
+    const tasks = await TeamTask.find({ creatorId });
+    const tasksCompleted = tasks.filter(t => t.status === 'completed').length;
+    const totalTasks = tasks.length;
+
+    // Calendar schedules
+    const events = await CalendarEvent.find({ creatorId });
+    const calendarEventsCount = events.length;
+
+    // Score calculation
+    const score = Math.round((totalDealsValue / 1000) * 10 + (tasksCompleted * 15) + (calendarEventsCount * 5));
+
+    performanceList.push({
+      id: creatorId,
+      name: c.name,
+      email: c.email,
+      status: c.status,
+      isPremium: c.isPremium,
+      totalDealsValue,
+      tasksCompleted,
+      totalTasks,
+      calendarEventsCount,
+      score
+    });
+  }
+
+  return performanceList.sort((a, b) => b.score - a.score);
+};
+
+export const getCreatorPerformance = async (req, res) => {
+  try {
+    const leaderboard = await getCreatorPerformanceData();
+    res.status(200).json({ success: true, leaderboard });
+  } catch (error) {
+    console.error('Get Creator Performance Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const getAIPerformanceAnalysis = async (req, res) => {
+  try {
+    const data = await getCreatorPerformanceData();
+    if (data.length === 0) {
+      return res.status(200).json({ success: true, analysis: 'No creator data available for AI performance analysis.' });
+    }
+
+    const leaderboardSummary = data.map((c, i) => 
+      `${i + 1}. ${c.name} (${c.email}) - Score: ${c.score}, Total Deals Value: ₹${c.totalDealsValue}, Tasks Completed: ${c.tasksCompleted}/${c.totalTasks}, Content Posts: ${c.calendarEventsCount}, Status: ${c.status}`
+    ).join('\n');
+
+    const prompt = `You are CreatorHub's Executive AI Performance Analyzer.
+Here is the live performance data of the content creators on our SaaS platform:
+${leaderboardSummary}
+
+Please write a highly professional, beautifully formatted markdown analysis report for the Administrator.
+Include:
+1. Executive Summary (Highlighting platform growth).
+2. Star Creator Spotlight (Acknowledge who is leading and why they are performing best based on deals and tasks).
+3. Actionable Growth Optimization tips for other creators on the platform.
+4. Alerts or Warnings (e.g. creators with pending tasks or inactive/suspended accounts).
+Use professional business SaaS vocabulary and markdown bullet points. Do not include markdown code block wrappings around the final markdown report text itself.`;
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (apiKey) {
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+          })
+        });
+        const resData = await response.json();
+        if (resData.candidates && resData.candidates[0].content.parts[0].text) {
+          return res.status(200).json({ success: true, analysis: resData.candidates[0].content.parts[0].text });
+        }
+      } catch (err) {
+        console.error('Gemini API fetch failed, falling back to mock analyser:', err.message);
+      }
+    }
+
+    // Dynamic Mock Fallback if API key is not configured or fails
+    const mockAnalysis = `### 🤖 CreatorHub AI Executive Performance Report
+
+#### 📊 1. Executive Summary
+The CreatorHub workspace ecosystem shows highly positive engagement metrics. Brand partnerships and sponsor deals represent the primary driver of platform value, followed by coordinated content calendar postings.
+
+#### 🏆 2. Star Creator Spotlight
+* **Leading Creator**: **${data[0]?.name || 'N/A'}** (${data[0]?.email || 'N/A'})
+* **Performance Analysis**: With a top Score of **${data[0]?.score || 0}** and brand partnerships valued at **₹${data[0]?.totalDealsValue.toLocaleString() || 0}**, this user demonstrates exceptional commercial execution. Coordinated team tasks completed (**${data[0]?.tasksCompleted || 0}**) confirm strong operational efficiency.
+
+#### 💡 3. Growth & Optimization Strategies
+* **Cross-Platform Scheduling**: Encourage creators to sync calendar reminders to prevent post fatigue.
+* **Deal Pipeline Progression**: Creators should transition leads from "Pitching" to "Completed" within 14 days to maximize monthly earnings velocity.
+
+#### ⚠️ 4. Administrative Risk Assessment
+* Make sure all active accounts follow whitelisted payment guidelines and that suspended profiles have their deal pipelines locked.
+`;
+    res.status(200).json({ success: true, analysis: mockAnalysis });
+  } catch (error) {
+    console.error('AI Performance Analysis Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

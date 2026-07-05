@@ -1,0 +1,26 @@
+[
+  {
+    "_id": "asds1imzyjmtcihaq422k",
+    "createdAt": "2026-07-05T05:29:55.642Z",
+    "updatedAt": "2026-07-05T05:29:55.643Z",
+    "name": "Ketan Paswan",
+    "email": "ketanpaswan53@gmail.com",
+    "password": "$2a$10$NwzmyfxiPhsjHH4Qy3k39uPN8KORF0XORVcjxGH.AE4zfQeZ0fSCe",
+    "role": "Super Admin",
+    "isVerified": true,
+    "status": "active"
+  },
+  {
+    "_id": "tvbyzrmk6vrcq93mk3co",
+    "createdAt": "2026-07-05T05:30:54.329Z",
+    "updatedAt": "2026-07-05T05:34:47.497Z",
+    "name": "ketan",
+    "email": "ketanpaswan@gmail.com",
+    "password": "$2a$10$H2sMn/5B88VM6QTlF8B0D.9enZVWqeXXpZVdUpnAOO58pccrNK0G6",
+    "role": "Creator",
+    "otp": null,
+    "otpExpires": null,
+    "isVerified": true,
+    "status": "suspended"
+  }
+]

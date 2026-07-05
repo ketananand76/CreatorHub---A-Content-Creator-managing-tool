@@ -1,0 +1,131 @@
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
+import { NotificationProvider } from './context/NotificationContext';
+
+// Pages
+import Login from './pages/Login';
+import Register from './pages/Register';
+import VerifyOTP from './pages/VerifyOTP';
+import ResetPassword from './pages/ResetPassword';
+import AdminLogin from './pages/AdminLogin';
+import Dashboard from './pages/Dashboard';
+import CalendarPage from './pages/CalendarPage';
+import BrandCRM from './pages/BrandCRM';
+import Earnings from './pages/Earnings';
+import TeamHub from './pages/TeamHub';
+import Subscription from './pages/Subscription';
+import SuperAdmin from './pages/SuperAdmin';
+import Support from './pages/Support';
+import SettingsPage from './pages/SettingsPage';
+
+// Components
+import Sidebar from './components/Sidebar';
+import TopHeader from './components/TopHeader';
+
+// Protected Route Wrapper
+const ProtectedRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-500"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+};
+
+// Admin/Super Admin Route Wrapper
+const AdminRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-500"></div>
+      </div>
+    );
+  }
+
+  if (!user || (user.role !== 'Admin' && user.role !== 'Super Admin')) {
+    return <Navigate to="/admin-login" replace />;
+  }
+
+  return children;
+};
+
+// App Layout Wrapper
+const AppLayout = () => {
+  const { user } = useAuth();
+  const currentRole = user?.role;
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-dark-bg text-slate-800 dark:text-dark-text transition-colors duration-300">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-w-0">
+        <TopHeader />
+        <main className="flex-1 overflow-y-auto bg-slate-50/50 dark:bg-dark-bg/60">
+          <Routes>
+            <Route path="/" element={currentRole === 'Admin' || currentRole === 'Super Admin' ? <Navigate to="/admin" replace /> : <Dashboard />} />
+            <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/crm" element={<BrandCRM />} />
+            <Route path="/earnings" element={<Earnings />} />
+            <Route path="/team" element={<TeamHub />} />
+            <Route path="/subscription" element={<Subscription />} />
+            <Route path="/support" element={<Support />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <SuperAdmin />
+                </AdminRoute>
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default function App() {
+  return (
+    <Router>
+      <ThemeProvider>
+        <NotificationProvider>
+          <AuthProvider>
+            <Routes>
+              {/* Unprotected Auth routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/verify-otp" element={<VerifyOTP />} />
+              <Route path="/forgot-password" element={<ResetPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/admin-login" element={<AdminLogin />} />
+
+              {/* Protected Workspace Layout */}
+              <Route
+                path="/*"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </AuthProvider>
+        </NotificationProvider>
+      </ThemeProvider>
+    </Router>
+  );
+}
