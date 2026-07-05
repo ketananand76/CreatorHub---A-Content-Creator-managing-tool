@@ -10,9 +10,13 @@ import {
 
 const AuthContext = createContext();
 
-export const API_BASE = (import.meta.env.VITE_API_BASE || '/api').replace(/\/$/, '');
-
 export const AuthProvider = ({ children }) => {
+  const API_BASE = String(
+    import.meta.env.VITE_API_BASE ||
+    import.meta.env.VITE_API_TARGET ||
+    import.meta.env.VITE_API_URL ||
+    '/api'
+  ).replace(/\/$/, '');
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [accessToken, setAccessToken] = useState(null);
