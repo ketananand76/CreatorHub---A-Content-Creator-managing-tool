@@ -80,9 +80,8 @@ export const startInstagramOAuth = () => {
   const STATE = btoa(JSON.stringify({ ts: Date.now(), origin: window.location.origin }));
 
   if (!INSTAGRAM_APP_ID) {
-    console.warn('[Instagram OAuth] VITE_INSTAGRAM_APP_ID not set in frontend .env');
-    // Open Instagram's generic login page if no app ID configured
-    window.open('https://www.instagram.com/accounts/login/', '_blank', 'width=500,height=700');
+    // No App ID configured — open Instagram's official login page directly
+    window.open('https://www.instagram.com/accounts/login/', '_blank', 'width=520,height=680,left=200,top=100');
     return;
   }
 
