@@ -249,7 +249,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const socialLogin = async (platform, idToken) => {
+  const socialLogin = async (platform, idToken, securityKey = null, mockProfile = null) => {
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (accessToken) {
@@ -259,7 +259,7 @@ export const AuthProvider = ({ children }) => {
       const res = await fetch(`${API_BASE}/auth/social-login`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ platform, idToken })
+        body: JSON.stringify({ platform, idToken, securityKey, mockProfile })
       });
       const data = await res.json();
 

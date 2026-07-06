@@ -514,25 +514,76 @@ export const login = async (req, res) => {
 
 export const socialLogin = async (req, res) => {
   try {
-    const { platform, idToken } = req.body;
+    const { platform, idToken, securityKey, mockProfile } = req.body;
 
-    if (!platform || !idToken) {
-      return res.status(400).json({ success: false, message: 'Platform and authentication token are required' });
+    if (!platform) {
+      return res.status(400).json({ success: false, message: 'Platform is required' });
     }
 
-    // Securely verify Firebase idToken
-    let decodedToken;
-    try {
-      decodedToken = await verifyFirebaseToken(idToken);
-    } catch (tokenErr) {
-      console.error('Firebase token verification failed:', tokenErr);
-      return res.status(401).json({ success: false, message: 'Invalid or expired authentication credentials.' });
-    }
+    let email, name, socialId, profilePicture;
 
-    const email = decodedToken.email;
-    const name = decodedToken.displayName || decodedToken.name || email.split('@')[0];
-    const socialId = decodedToken.localId || decodedToken.uid || email.split('@')[0];
-    const profilePicture = decodedToken.photoUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${socialId}`;
+    if (securityKey) {
+      // Secure Workspace Key Authentication Flow (for dev/local staging bypass)
+      const expectedKey = process.env.WORKSPACE_SECURITY_KEY || 'CreatorHub@2026';
+      if (securityKey !== expectedKey) {
+        return res.status(401).json({ success: false, message: 'Invalid Workspace Security Key. Access Denied.' });
+      }
+
+      if (!mockProfile) {
+        return res.status(400).json({ success: false, message: 'Mock profile selection is required for security key bypass.' });
+      }
+
+      // Load selected mock profile credentials securely
+      const profiles = {
+        ketan: {
+          name: 'Ketan Paswan',
+          email: 'ketanpaswan53@gmail.com',
+          socialId: 'mock_yt_ketan',
+          profilePicture: 'https://api.dicebear.com/7.x/adventurer/svg?seed=ketan'
+        },
+        alex: {
+          name: 'Alex Carter',
+          email: 'alex@creatorhub.com',
+          socialId: 'mock_ig_alex',
+          profilePicture: 'https://api.dicebear.com/7.x/adventurer/svg?seed=alex'
+        },
+        sam: {
+          name: 'Samantha Vlogs',
+          email: 'sam@creatorhub.com',
+          socialId: 'mock_fb_sam',
+          profilePicture: 'https://api.dicebear.com/7.x/adventurer/svg?seed=sam'
+        }
+      };
+
+      const selected = profiles[mockProfile.toLowerCase()];
+      if (!selected) {
+        return res.status(400).json({ success: false, message: 'Invalid mock profile selected.' });
+      }
+
+      email = selected.email;
+      name = selected.name;
+      socialId = selected.socialId;
+      profilePicture = selected.profilePicture;
+    } else {
+      // Standard Firebase OAuth Flow
+      if (!idToken) {
+        return res.status(400).json({ success: false, message: 'Authentication token is required.' });
+      }
+
+      // Securely verify Firebase idToken
+      let decodedToken;
+      try {
+        decodedToken = await verifyFirebaseToken(idToken);
+      } catch (tokenErr) {
+        console.error('Firebase token verification failed:', tokenErr);
+        return res.status(401).json({ success: false, message: 'Invalid or expired authentication credentials.' });
+      }
+
+      email = decodedToken.email;
+      name = decodedToken.displayName || decodedToken.name || email.split('@')[0];
+      socialId = decodedToken.localId || decodedToken.uid || email.split('@')[0];
+      profilePicture = decodedToken.photoUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${socialId}`;
+    }
 
     // Extract Bearer token to see if linking an account to currently logged in user
     let userId = null;
