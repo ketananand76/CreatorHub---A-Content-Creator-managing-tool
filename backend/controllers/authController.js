@@ -398,8 +398,7 @@ export const login = async (req, res) => {
 
     if (!user.isVerified) {
       const verificationToken = Array.from({ length: 32 }, () => Math.random().toString(36)[2] || '0').join('');
-      user.verificationToken = verificationToken;
-      await user.save();
+      await User.findByIdAndUpdate(user._id || user.id, { verificationToken });
 
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
       const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}&email=${encodeURIComponent(user.email)}`;
@@ -766,9 +765,10 @@ export const forgotPassword = async (req, res) => {
     const token = Array.from({ length: 32 }, () => Math.random().toString(36)[2] || '0').join('');
     const resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-    user.resetPasswordToken = token;
-    user.resetPasswordExpires = resetPasswordExpires;
-    await user.save();
+    await User.findByIdAndUpdate(user._id || user.id, {
+      resetPasswordToken: token,
+      resetPasswordExpires: resetPasswordExpires
+    });
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const resetLink = `${frontendUrl}/reset-password?token=${token}`;
@@ -806,10 +806,11 @@ export const resetPassword = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    user.password = hashedPassword;
-    user.resetPasswordToken = null;
-    user.resetPasswordExpires = null;
-    await user.save();
+    await User.findByIdAndUpdate(user._id || user.id, {
+      password: hashedPassword,
+      resetPasswordToken: null,
+      resetPasswordExpires: null
+    });
 
     res.status(200).json({ success: true, message: 'Password has been reset successfully!' });
   } catch (error) {
@@ -831,8 +832,7 @@ export const resendOTP = async (req, res) => {
     }
 
     const verificationToken = Array.from({ length: 32 }, () => Math.random().toString(36)[2] || '0').join('');
-    user.verificationToken = verificationToken;
-    await user.save();
+    await User.findByIdAndUpdate(user._id || user.id, { verificationToken });
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;
@@ -862,9 +862,10 @@ export const verifyEmailLink = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid or expired verification link.' });
     }
 
-    user.isVerified = true;
-    user.verificationToken = null;
-    await user.save();
+    await User.findByIdAndUpdate(user._id || user.id, {
+      isVerified: true,
+      verificationToken: null
+    });
 
     const { accessToken, refreshToken } = generateTokens(user);
 
