@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import Logo from '../components/Logo';
 import { Mail, Lock, User, UserCheck, Shield, Eye, EyeOff, Youtube, Facebook, Instagram } from 'lucide-react';
 import { firebaseSignInWithGoogle, firebaseSignInWithFacebook, getIdToken } from '../firebase.js';
