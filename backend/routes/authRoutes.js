@@ -12,7 +12,8 @@ import {
   resetPassword,
   resendOTP,
   getProfile,
-  updateProfile
+  updateProfile,
+  verifyEmailLink
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -20,6 +21,7 @@ const router = express.Router();
 
 router.post('/register', register);
 router.post('/verify-otp', verifyOTP);
+router.post('/verify-email', verifyEmailLink);
 router.post('/resend-otp', resendOTP);
 router.post('/login', login);
 router.post('/social-login', socialLogin);

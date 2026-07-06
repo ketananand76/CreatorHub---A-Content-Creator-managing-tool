@@ -208,7 +208,7 @@ export const AuthProvider = ({ children }) => {
       const res = await fetch(`${API_BASE}/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp })
+        body: JSON.stringify({ email }) // OTP is omitted, backend checks isVerified status directly
       });
       const data = await res.json();
 
@@ -223,6 +223,29 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.error('Verify Error:', err);
       return { success: false, message: err.message || 'Verification failed.' };
+    }
+  };
+
+  const verifyEmailToken = async (token) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/verify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setUser(data.user);
+        setAccessToken(data.accessToken);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('refreshToken', data.refreshToken);
+      }
+
+      return data;
+    } catch (err) {
+      console.error('Verify Email Token Error:', err);
+      return { success: false, message: err.message || 'Email verification failed.' };
     }
   };
 
@@ -284,6 +307,7 @@ export const AuthProvider = ({ children }) => {
       login,
       register,
       verifyOTP,
+      verifyEmailToken,
       socialLogin,
       socialLoginSuccess,
       logout,

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { motion } from 'framer-motion';
 import Logo from '../components/Logo';
-import { ShieldCheck, Mail, RefreshCw } from 'lucide-react';
+import { ShieldCheck, Mail, RefreshCw, ExternalLink } from 'lucide-react';
 
 export default function VerifyOTP() {
   const { verifyOTP } = useAuth();
@@ -13,7 +13,7 @@ export default function VerifyOTP() {
   const location = useLocation();
 
   const email = location.state?.email || '';
-  const [otp, setOtp] = useState('');
+  const [simulatedLink, setSimulatedLink] = useState(location.state?.simulatedLink || '');
   const [timer, setTimer] = useState(60);
   const [loading, setLoading] = useState(false);
 
@@ -33,16 +33,10 @@ export default function VerifyOTP() {
     return () => clearInterval(interval);
   }, [timer]);
 
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    if (otp.length !== 6) {
-      showNotification('Please enter a valid 6-digit code.', 'warning');
-      return;
-    }
-
+  const handleCheckVerification = async () => {
     setLoading(true);
     try {
-      const data = await verifyOTP(email, otp);
+      const data = await verifyOTP(email); // Checks backend isVerified status
       if (data.success) {
         showNotification('Email verified! You are now logged in.', 'success');
         const role = data?.user?.role;
@@ -52,7 +46,7 @@ export default function VerifyOTP() {
           navigate('/');
         }
       } else {
-        showNotification(data.message || 'Incorrect OTP code. Please try again.', 'error');
+        showNotification(data.message || 'Email not verified yet. Please click the link in your inbox.', 'warning');
       }
     } catch (err) {
       showNotification('Verification check failed.', 'error');
@@ -81,7 +75,10 @@ export default function VerifyOTP() {
       const data = await res.json();
       
       if (data.success) {
-        showNotification('A new security code has been sent successfully!', 'success');
+        showNotification('A new verification link has been sent successfully!', 'success');
+        if (data.simulatedLink) {
+          setSimulatedLink(data.simulatedLink);
+        }
         setTimer(60);
       } else {
         showNotification(data.message || 'Resend failed.', 'error');
@@ -108,36 +105,24 @@ export default function VerifyOTP() {
           <div className="w-14 h-14 bg-brand-500/10 rounded-full flex items-center justify-center mx-auto mt-6 text-brand-500">
             <Mail className="w-7 h-7" />
           </div>
-          <h3 className="font-bold text-lg text-slate-800 dark:text-white mt-3">Confirm Your Account</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 px-4 leading-relaxed">
-            Enter the 6-digit OTP code sent to{' '}
-            <span className="font-semibold text-brand-500">{email}</span>.
+          <h3 className="font-bold text-lg text-slate-800 dark:text-white mt-3">Check Your Email</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 px-4 leading-relaxed font-medium">
+            A secure <strong>verification link</strong> has been sent to{' '}
+            <span className="font-bold text-brand-500">{email}</span>.
+          </p>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2 px-6">
+            Click the link in the email to verify your workspace, then return here and click the button below to sign in.
           </p>
         </div>
 
-        <form onSubmit={handleVerify} className="space-y-4">
-          <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center mb-2">
-              Verification Code
-            </label>
-            <input
-              type="text"
-              required
-              maxLength={6}
-              placeholder="e.g. 123456"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-white text-center font-mono font-bold text-xl tracking-widest"
-            />
-          </div>
-
+        <div className="space-y-4">
           <button
-            type="submit"
-            disabled={loading || otp.length !== 6}
+            onClick={handleCheckVerification}
+            disabled={loading}
             className="w-full py-3.5 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white rounded-xl font-bold transition-all shadow-md shadow-brand-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <ShieldCheck className="w-4 h-4" />
-            {loading ? 'Verifying...' : 'Verify OTP & Login'}
+            {loading ? 'Checking status...' : "I've Verified My Email →"}
           </button>
 
           <button
@@ -147,15 +132,25 @@ export default function VerifyOTP() {
             className="w-full py-3 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 rounded-xl font-bold text-xs text-slate-600 dark:text-slate-300 transition-all disabled:opacity-50 flex items-center justify-center gap-2 uppercase tracking-wider"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            {timer > 0 ? `Resend available in ${timer}s` : 'Resend Verification Code'}
+            {timer > 0 ? `Resend available in ${timer}s` : 'Resend Verification Link'}
           </button>
-        </form>
-
-        <div className="mt-6 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900">
-          <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-            <strong>📧 Hint:</strong> If SMTP is not configured in `.env`, the verification code prints in the backend console logs.
-          </p>
         </div>
+
+        {simulatedLink && (
+          <div className="mt-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+            <p className="text-xs text-blue-500 leading-relaxed font-semibold mb-2">
+              🧪 developer simulation link:
+            </p>
+            <a
+              href={simulatedLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-bold text-brand-500 hover:underline flex items-center gap-1 break-all"
+            >
+              Click here to verify email directly <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+            </a>
+          </div>
+        )}
       </motion.div>
     </div>
   );

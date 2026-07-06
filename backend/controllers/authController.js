@@ -117,11 +117,106 @@ const sendOTPEmail = async (email, otp) => {
           'X-Priority': '3',
           'X-MSMail-Priority': 'Normal',
           'Importance': 'Normal'
+  }
+};
+
+const sendLinkEmail = async (email, link, type = 'verification') => {
+  const isReset = type === 'reset';
+  const brandTemplate = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; background-color: #f5f7fb; color: #0f172a; margin: 0; padding: 0; }
+    .email-container { max-width: 560px; margin: 24px auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; }
+    .header { background: linear-gradient(135deg, #4f46e5, #0f172a); padding: 28px 24px; text-align: center; }
+    .logo { color: #ffffff; font-size: 24px; font-weight: 800; margin-bottom: 4px; }
+    .subtitle { color: #c7d2fe; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.6px; }
+    .content { padding: 32px 28px; text-align: center; }
+    .title { font-size: 20px; font-weight: 700; color: #111827; margin-bottom: 10px; }
+    .text { font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 22px; }
+    .action-btn { display: inline-block; background: linear-gradient(135deg, #4f46e5, #4338ca); color: #ffffff !important; font-weight: 700; text-decoration: none; padding: 14px 30px; border-radius: 10px; font-size: 13px; margin: 10px auto 20px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 10px rgba(79, 70, 229, 0.2); }
+    .footer { background-color: #f8fafc; padding: 20px 24px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 12px; color: #64748b; }
+    .footer a { color: #4f46e5; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="header">
+      <div class="logo">CreatorHub</div>
+      <div class="subtitle">${isReset ? 'Password Reset Security' : 'Secure Account Verification'}</div>
+    </div>
+    <div class="content">
+      <div class="title">${isReset ? 'Reset Your Password' : 'Confirm Your Account'}</div>
+      <div class="text">
+        ${isReset 
+          ? 'We received a request to reset your password. Click the secure button below to choose a new password.' 
+          : 'Thank you for registering at CreatorHub. To active your workspace account, please verify your email address by clicking the button below.'
         }
+      </div>
+      <div>
+        <a href="${link}" class="action-btn" target="_blank">${isReset ? 'Reset Password' : 'Verify Email Address'}</a>
+      </div>
+      <div class="text" style="margin-top: 16px; font-size: 12px; color: #64748b;">
+        If the button above does not work, copy and paste this URL into your browser:<br/>
+        <a href="${link}" style="color: #4f46e5; word-break: break-all;">${link}</a>
+      </div>
+      <div class="text" style="margin-top: 16px; font-size: 12px; color: #64748b;">
+        If you did not request this, you can safely ignore this email. Your account remains secure.
+      </div>
+    </div>
+    <div class="footer">
+      <div>Need help? Contact support at support@creatorhub.com</div>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  console.log('========================================================================');
+  console.log(`[EMAIL SEND SIMULATOR] To: ${email}`);
+  console.log(`[SECURITY LINK]: ${link}`);
+  console.log('------------------------------------------------------------------------');
+  console.log(brandTemplate);
+  console.log('========================================================================');
+
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    try {
+      const isGmail = (process.env.SMTP_HOST || '').toLowerCase().includes('gmail');
+      const transporter = nodemailer.createTransport(
+        isGmail 
+          ? {
+              service: 'gmail',
+              auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS
+              }
+            }
+          : {
+              host: process.env.SMTP_HOST || 'smtp.gmail.com',
+              port: Number(process.env.SMTP_PORT) || 465,
+              secure: Number(process.env.SMTP_PORT) === 465,
+              auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS
+              }
+            }
+      );
+
+      const senderName = process.env.MAIL_FROM_NAME || 'CreatorHub Team';
+      const senderAddress = process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER;
+
+      await transporter.sendMail({
+        from: `"${senderName}" <${senderAddress}>`,
+        to: email,
+        subject: isReset ? 'CreatorHub: Reset Your Password' : 'CreatorHub: Verify Your Email Address',
+        html: brandTemplate,
       });
-      console.log(`[SMTP] Real verification email sent successfully to: ${email}`);
+      console.log(`[SMTP] Real link email sent successfully to: ${email}`);
     } catch (err) {
-      console.error('[SMTP] Real email transmission failed:', err.message);
+      console.error('[SMTP] Real email link transmission failed:', err.message);
     }
   }
 };
@@ -155,8 +250,7 @@ export const register = async (req, res) => {
       userRole = 'Team Member';
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+    const verificationToken = Array.from({ length: 32 }, () => Math.random().toString(36)[2] || '0').join('');
 
     const newUser = await User.create({
       name,
@@ -164,19 +258,21 @@ export const register = async (req, res) => {
       password: hashedPassword,
       role: userRole,
       isVerified: false,
-      otp,
-      otpExpires,
+      verificationToken,
       status: 'active'
     });
 
-    await sendOTPEmail(email, otp);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;
+    
+    await sendLinkEmail(email, verificationLink, 'verification');
 
     res.status(201).json({
       success: true,
       requiresVerification: true,
-      message: 'Registration successful. Please verify your email using the 6-digit OTP code sent to your inbox.',
+      message: 'Registration successful. A verification link has been sent to your inbox.',
       email: newUser.email,
-      simulatedOTP: otp
+      simulatedLink: verificationLink
     });
   } catch (error) {
     console.error('Registration Error:', error);
@@ -186,9 +282,9 @@ export const register = async (req, res) => {
 
 export const verifyOTP = async (req, res) => {
   try {
-    const { email, otp } = req.body;
-    if (!email || !otp) {
-      return res.status(400).json({ success: false, message: 'Email and OTP are required' });
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
     }
 
     const user = await User.findOne({ email });
@@ -197,34 +293,30 @@ export const verifyOTP = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User record not found.' });
     }
 
-    if (user.otp !== otp || new Date(user.otpExpires) < new Date()) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired OTP code' });
+    if (user.isVerified) {
+      const { accessToken, refreshToken } = generateTokens(user);
+      res.status(200).json({
+        success: true,
+        message: 'Account verified successfully!',
+        accessToken,
+        refreshToken,
+        user: {
+          id: user._id || user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          isPremium: user.isPremium,
+          isTwoFAEnabled: user.isTwoFAEnabled
+        }
+      });
+    } else {
+      res.status(200).json({
+        success: false,
+        message: 'Email has not been verified yet. Please click the link in your inbox.'
+      });
     }
-
-    const updatedUser = await User.findOneAndUpdate(
-      { email },
-      { isVerified: true, otp: null, otpExpires: null },
-      { new: true }
-    );
-
-    const { accessToken, refreshToken } = generateTokens(updatedUser);
-
-    res.status(200).json({
-      success: true,
-      message: 'Account verified successfully!',
-      accessToken,
-      refreshToken,
-      user: {
-        id: updatedUser._id || updatedUser.id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        role: updatedUser.role,
-        isPremium: updatedUser.isPremium,
-        isTwoFAEnabled: updatedUser.isTwoFAEnabled
-      }
-    });
   } catch (error) {
-    console.error('Verification Error:', error);
+    console.error('Verification Check Error:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };
@@ -299,17 +391,20 @@ export const login = async (req, res) => {
     }
 
     if (!user.isVerified) {
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
-      await User.findByIdAndUpdate(user._id || user.id, { otp, otpExpires });
-      await sendOTPEmail(user.email, otp);
+      const verificationToken = Array.from({ length: 32 }, () => Math.random().toString(36)[2] || '0').join('');
+      user.verificationToken = verificationToken;
+      await user.save();
+
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}&email=${encodeURIComponent(user.email)}`;
+      await sendLinkEmail(user.email, verificationLink, 'verification');
 
       return res.status(200).json({
         success: false,
         requiresVerification: true,
-        message: 'Account is not verified. Please check your email inbox.',
+        message: 'Account is not verified. A verification link has been sent to your inbox.',
         email: user.email,
-        simulatedOTP: otp
+        simulatedLink: verificationLink
       });
     }
 
@@ -662,17 +757,22 @@ export const forgotPassword = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found with this email' });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+    const token = Array.from({ length: 32 }, () => Math.random().toString(36)[2] || '0').join('');
+    const resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-    await User.findByIdAndUpdate(user._id || user.id, { otp, otpExpires });
-    sendOTPEmail(email, otp);
+    user.resetPasswordToken = token;
+    user.resetPasswordExpires = resetPasswordExpires;
+    await user.save();
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const resetLink = `${frontendUrl}/reset-password?token=${token}`;
+    
+    await sendLinkEmail(email, resetLink, 'reset');
 
     res.status(200).json({
       success: true,
-      message: 'Reset OTP sent to email',
-      tempUserId: user._id || user.id,
-      simulatedOTP: otp
+      message: 'Reset link sent to email',
+      simulatedLink: resetLink
     });
   } catch (error) {
     console.error('Forgot Password Error:', error);
@@ -682,31 +782,30 @@ export const forgotPassword = async (req, res) => {
 
 export const resetPassword = async (req, res) => {
   try {
-    const { userId, otp, newPassword } = req.body;
+    const { token, newPassword } = req.body;
 
-    if (!userId || !otp || !newPassword) {
-      return res.status(400).json({ success: false, message: 'All fields are required' });
+    if (!token || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Token and new password are required' });
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: new Date() }
+    });
+
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
-    if (user.otp !== otp || new Date(user.otpExpires) < new Date()) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+      return res.status(400).json({ success: false, message: 'Invalid or expired password reset link.' });
     }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    await User.findByIdAndUpdate(userId, {
-      password: hashedPassword,
-      otp: null,
-      otpExpires: null
-    });
+    user.password = hashedPassword;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
 
-    res.status(200).json({ success: true, message: 'Password reset successfully' });
+    res.status(200).json({ success: true, message: 'Password has been reset successfully!' });
   } catch (error) {
     console.error('Reset Password Error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -725,20 +824,61 @@ export const resendOTP = async (req, res) => {
       return res.status(404).json({ success: false, message: 'No registered user found with this email' });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+    const verificationToken = Array.from({ length: 32 }, () => Math.random().toString(36)[2] || '0').join('');
+    user.verificationToken = verificationToken;
+    await user.save();
 
-    await User.findByIdAndUpdate(user._id || user.id, { otp, otpExpires });
-    sendOTPEmail(email, otp);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;
+    
+    await sendLinkEmail(email, verificationLink, 'verification');
 
     res.status(200).json({
       success: true,
-      message: 'A new 6-digit OTP code has been sent successfully.',
-      simulatedOTP: otp
+      message: 'A new verification link has been sent successfully.',
+      simulatedLink: verificationLink
     });
   } catch (error) {
-    console.error('Resend OTP Error:', error);
+    console.error('Resend Link Error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const verifyEmailLink = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Verification token is required.' });
+    }
+
+    const user = await User.findOne({ verificationToken: token });
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired verification link.' });
+    }
+
+    user.isVerified = true;
+    user.verificationToken = null;
+    await user.save();
+
+    const { accessToken, refreshToken } = generateTokens(user);
+
+    res.status(200).json({
+      success: true,
+      message: 'Account verified successfully!',
+      accessToken,
+      refreshToken,
+      user: {
+        id: user._id || user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isPremium: user.isPremium,
+        isTwoFAEnabled: user.isTwoFAEnabled
+      }
+    });
+  } catch (error) {
+    console.error('Verify Email Link Error:', error);
+    res.status(500).json({ success: false, message: 'Server error during email verification.' });
   }
 };
 

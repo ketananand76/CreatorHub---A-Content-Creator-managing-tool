@@ -28,7 +28,7 @@ export default function Register() {
       if (data.success) {
         if (data.requiresVerification) {
           showNotification('Account created! A verification link has been sent to your email. Please click it to verify.', 'success');
-          navigate('/verify-otp', { state: { email: formData.email } });
+          navigate('/verify-otp', { state: { email: formData.email, simulatedLink: data.simulatedLink } });
         } else {
           showNotification('Registration successful!', 'success');
           if (data.user?.role === 'Admin' || data.user?.role === 'Super Admin') navigate('/admin');
