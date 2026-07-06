@@ -73,8 +73,15 @@ export default function Register() {
         showNotification(data.message || 'Social registration failed', 'error');
       }
     } catch (err) {
-      console.error(err);
-      showNotification('Social registration was cancelled or failed.', 'error');
+      console.error('Social Register Error:', err);
+      const friendlyMessage = err.code === 'auth/popup-blocked'
+        ? 'Sign-in popup was blocked by your browser. Please allow popups for this site.'
+        : err.code === 'auth/operation-not-allowed'
+        ? 'This social provider is not enabled/configured in your Firebase Console.'
+        : err.code === 'auth/popup-closed-by-user'
+        ? 'Sign-in popup was closed before completion.'
+        : err.message || 'Social registration failed.';
+      showNotification(friendlyMessage, 'error');
     } finally {
       setLoading(false);
     }
