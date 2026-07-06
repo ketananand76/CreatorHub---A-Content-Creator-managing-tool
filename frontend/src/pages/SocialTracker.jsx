@@ -470,9 +470,6 @@ export default function SocialTracker() {
           )}
         </>
       )}
-    </div>
-  );
-}
       {/* Secure Workspace Key validation Modal */}
       <AnimatePresence>
         {showBypassModal && (
@@ -549,3 +546,6 @@ export default function SocialTracker() {
           </div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
