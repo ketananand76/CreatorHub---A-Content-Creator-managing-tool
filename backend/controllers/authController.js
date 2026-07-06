@@ -117,6 +117,12 @@ const sendOTPEmail = async (email, otp) => {
           'X-Priority': '3',
           'X-MSMail-Priority': 'Normal',
           'Importance': 'Normal'
+        }
+      });
+      console.log(`[SMTP] Real verification email sent successfully to: ${email}`);
+    } catch (err) {
+      console.error('[SMTP] Real email transmission failed:', err.message);
+    }
   }
 };
 
