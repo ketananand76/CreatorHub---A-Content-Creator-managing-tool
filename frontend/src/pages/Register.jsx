@@ -1,14 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import Logo from '../components/Logo';
 import { Mail, Lock, User, UserCheck, Shield, Eye, EyeOff, Youtube, Facebook, Instagram } from 'lucide-react';
-import { firebaseSignInWithGoogle, firebaseSignInWithFacebook, getIdToken } from '../firebase.js';
+import {
+  firebaseSignInWithGoogle,
+  firebaseSignInWithFacebook,
+  startInstagramOAuth
+} from '../firebase.js';
 
 export default function Register() {
-  const { register, socialLogin } = useAuth();
+  const { register, savePendingSocialPlatform } = useAuth();
   const { showNotification } = useNotification();
   const navigate = useNavigate();
 
@@ -20,11 +24,16 @@ export default function Register() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showBypassModal, setShowBypassModal] = useState(false);
-  const [bypassPlatform, setBypassPlatform] = useState('');
-  const [mockProfile, setMockProfile] = useState('ketan');
-  const [securityKey, setSecurityKey] = useState('');
-  const [showKey, setShowKey] = useState(false);
+
+  // Redirect success detection after Firebase OAuth returns
+  useEffect(() => {
+    const success = sessionStorage.getItem('socialLoginSuccess');
+    if (success) {
+      sessionStorage.removeItem('socialLoginSuccess');
+      showNotification('Successfully registered!', 'success');
+      navigate('/');
+    }
+  }, [navigate, showNotification]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -51,60 +60,22 @@ export default function Register() {
     }
   };
 
-  React.useEffect(() => {
-    const redirectErr = sessionStorage.getItem('authRedirectError');
-    if (redirectErr) {
-      sessionStorage.removeItem('authRedirectError');
-      showNotification(redirectErr, 'error');
-    }
-  }, [showNotification]);
-
-  const handleBypassSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const data = await socialLogin(bypassPlatform, null, securityKey, mockProfile);
-      if (data.success) {
-        showNotification('Workspace authenticated successfully!', 'success');
-        setShowBypassModal(false);
-        setSecurityKey('');
-        navigate('/');
-      } else {
-        showNotification(data.message || 'Verification failed. Incorrect Security Key.', 'error');
-      }
-    } catch (err) {
-      console.error(err);
-      showNotification('Verification request failed.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // ─── Official OAuth Redirects ─────────────────────────────────
   const handleSocialRegister = async (platform) => {
     setLoading(true);
     try {
-      let credential;
+      savePendingSocialPlatform(platform);
+
       if (platform === 'youtube') {
-        credential = await firebaseSignInWithGoogle();
-      } else {
-        credential = await firebaseSignInWithFacebook();
-      }
-      const idToken = await getIdToken(credential.user);
-      
-      const data = await socialLogin(platform, idToken);
-      if (data.success) {
-        showNotification(`Successfully registered via ${platform.charAt(0).toUpperCase() + platform.slice(1)}!`, 'success');
-        navigate('/');
-      } else {
-        showNotification(data.message || 'Social registration failed', 'error');
+        await firebaseSignInWithGoogle();
+      } else if (platform === 'facebook') {
+        await firebaseSignInWithFacebook();
+      } else if (platform === 'instagram') {
+        startInstagramOAuth();
       }
     } catch (err) {
-      console.error('Social Register Error:', err);
-      // For any Firebase auth error (blocked popup, operation not allowed, etc.), open the Workspace Security Key fallback modal!
-      setBypassPlatform(platform);
-      setShowBypassModal(true);
-      showNotification('Opening Secure Workspace Key authentication...', 'info');
-    } finally {
+      console.error('Social Register redirect error:', err);
+      showNotification(err.message || 'Failed to start social registration.', 'error');
       setLoading(false);
     }
   };
@@ -238,23 +209,23 @@ export default function Register() {
           <div className="relative flex justify-center text-xs uppercase"><span className="bg-slate-50 dark:bg-dark-card px-2 text-slate-400">Or Register With</span></div>
         </div>
 
-        {/* Social Logins */}
+        {/* Social Register Buttons — open official platform pages */}
         <div className="space-y-3">
           <button
             type="button"
             onClick={() => handleSocialRegister('youtube')}
             disabled={loading}
-            className="w-full py-3 border border-red-200 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-950/15 rounded-xl font-bold text-sm text-red-600 dark:text-red-400 transition-all flex items-center justify-center gap-2"
+            className="w-full py-3 border border-red-200 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-950/15 rounded-xl font-bold text-sm text-red-600 dark:text-red-400 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <Youtube className="w-4 h-4" />
-            Register with YouTube
+            Register with Google (YouTube)
           </button>
 
           <button
             type="button"
             onClick={() => handleSocialRegister('instagram')}
             disabled={loading}
-            className="w-full py-3 border border-pink-200 dark:border-pink-900/30 hover:bg-pink-50 dark:hover:bg-pink-950/15 rounded-xl font-bold text-sm text-pink-600 dark:text-pink-400 transition-all flex items-center justify-center gap-2"
+            className="w-full py-3 border border-pink-200 dark:border-pink-900/30 hover:bg-pink-50 dark:hover:bg-pink-950/15 rounded-xl font-bold text-sm text-pink-600 dark:text-pink-400 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <Instagram className="w-4 h-4" />
             Register with Instagram

@@ -61,9 +61,40 @@ export const AuthProvider = ({ children }) => {
     };
 
     initializeAuth();
+
+    // ── Handle Firebase redirect result (official Google/Facebook login) ──
+    // After the user logs in on Google/Facebook and returns to our app,
+    // Firebase stores the credential. We read it here and send the idToken to backend.
+    (async () => {
+      try {
+        const { getFirebaseRedirectResult, getIdToken } = await import('../firebase.js');
+        const result = await getFirebaseRedirectResult();
+        if (result && result.user) {
+          const idToken = await getIdToken(result.user);
+          const pendingPlatform = sessionStorage.getItem('pendingSocialPlatform') || 'youtube';
+          sessionStorage.removeItem('pendingSocialPlatform');
+
+          const headers = { 'Content-Type': 'application/json' };
+          const res = await fetch(`${API_BASE}/auth/social-login`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ platform: pendingPlatform, idToken })
+          });
+          const data = await res.json();
+          if (data.success) {
+            setUser(data.user);
+            setAccessToken(data.accessToken);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('refreshToken', data.refreshToken);
+            sessionStorage.setItem('socialLoginSuccess', '1');
+          }
+        }
+      } catch (redirectErr) {
+        console.warn('No redirect result or redirect failed:', redirectErr.message);
+      }
+    })();
   }, []);
 
-  // Social login popup handling replaces Firebase redirects.
 
   // Periodic token refresh every 10 minutes
   useEffect(() => {
@@ -249,7 +280,13 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const socialLogin = async (platform, idToken, securityKey = null, mockProfile = null) => {
+  // Called by Login/Register pages BEFORE triggering the social redirect.
+  // We save the platform so we know which one to use when the redirect returns.
+  const savePendingSocialPlatform = (platform) => {
+    sessionStorage.setItem('pendingSocialPlatform', platform);
+  };
+
+  const socialLogin = async (platform, idToken) => {
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (accessToken) {
@@ -259,7 +296,7 @@ export const AuthProvider = ({ children }) => {
       const res = await fetch(`${API_BASE}/auth/social-login`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ platform, idToken, securityKey, mockProfile })
+        body: JSON.stringify({ platform, idToken })
       });
       const data = await res.json();
 
@@ -315,6 +352,7 @@ export const AuthProvider = ({ children }) => {
       verifyEmailToken,
       socialLogin,
       socialLoginSuccess,
+      savePendingSocialPlatform,
       logout,
       authFetch,
       updateLocalUser,

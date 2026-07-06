@@ -7,18 +7,13 @@ import { Globe, Youtube, Facebook, Instagram, RefreshCw, BarChart2, TrendingUp, 
 import { firebaseSignInWithGoogle, firebaseSignInWithFacebook, getIdToken } from '../firebase.js';
 
 export default function SocialTracker() {
-  const { authFetch } = useAuth();
+  const { authFetch, savePendingSocialPlatform } = useAuth();
   const { showNotification } = useNotification();
 
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [activePlatformFilter, setActivePlatformFilter] = useState('all');
-  const [showBypassModal, setShowBypassModal] = useState(false);
-  const [bypassPlatform, setBypassPlatform] = useState('');
-  const [mockProfile, setMockProfile] = useState('ketan');
-  const [securityKey, setSecurityKey] = useState('');
-  const [showKey, setShowKey] = useState(false);
 
   const fetchSocialAccounts = async () => {
     try {
@@ -39,59 +34,25 @@ export default function SocialTracker() {
     fetchSocialAccounts();
   }, []);
 
-  const handleBypassSubmit = async (e) => {
-    e.preventDefault();
-    setSyncing(true);
-    try {
-      const res = await authFetch('/auth/social-login', {
-        method: 'POST',
-        body: JSON.stringify({ platform: bypassPlatform, securityKey, mockProfile })
-      });
-      const data = await res.json();
-      if (data.success) {
-        showNotification(`Successfully connected ${bypassPlatform.toUpperCase()} profile!`, 'success');
-        setShowBypassModal(false);
-        setSecurityKey('');
-        fetchSocialAccounts();
-      } else {
-        showNotification(data.message || 'Verification failed. Incorrect Security Key.', 'error');
-      }
-    } catch (err) {
-      console.error(err);
-      showNotification('Verification request failed.', 'error');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
+  // ── Official OAuth connect ──
+  // Clicking Connect redirects to the real Google / Facebook / Instagram
+  // login page. After auth, Firebase redirect result is handled in AuthContext.
   const handleConnect = async (platform) => {
     try {
-      let credential;
+      savePendingSocialPlatform(platform);
       if (platform === 'youtube') {
-        credential = await firebaseSignInWithGoogle();
-      } else {
-        credential = await firebaseSignInWithFacebook();
-      }
-      const idToken = await getIdToken(credential.user);
-      
-      const res = await authFetch('/auth/social-login', {
-        method: 'POST',
-        body: JSON.stringify({ platform, idToken })
-      });
-      const data = await res.json();
-      
-      if (data.success) {
-        showNotification(`Successfully connected ${platform.charAt(0).toUpperCase() + platform.slice(1)} profile!`, 'success');
-        fetchSocialAccounts();
-      } else {
-        showNotification(data.message || 'Failed to connect profile', 'error');
+        const { firebaseSignInWithGoogle } = await import('../firebase.js');
+        await firebaseSignInWithGoogle();
+      } else if (platform === 'facebook') {
+        const { firebaseSignInWithFacebook } = await import('../firebase.js');
+        await firebaseSignInWithFacebook();
+      } else if (platform === 'instagram') {
+        const { startInstagramOAuth } = await import('../firebase.js');
+        startInstagramOAuth();
       }
     } catch (err) {
       console.error('Social Connect Error:', err);
-      // For any Firebase auth error (blocked popup, operation not allowed, etc.), open the Workspace Security Key fallback modal!
-      setBypassPlatform(platform);
-      setShowBypassModal(true);
-      showNotification('Opening Secure Workspace Key authentication...', 'info');
+      showNotification(err.message || 'Failed to start social connection.', 'error');
     }
   };
 
@@ -463,82 +424,6 @@ export default function SocialTracker() {
           )}
         </>
       )}
-      {/* Secure Workspace Key validation Modal */}
-      <AnimatePresence>
-        {showBypassModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white dark:bg-[#0f172a] border dark:border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl relative"
-            >
-              <div className="flex flex-col items-center text-center space-y-2">
-                <div className="w-12 h-12 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-500">
-                  <Globe className="w-5 h-5 animate-pulse" />
-                </div>
-                <h3 className="text-lg font-bold font-outfit text-slate-800 dark:text-white">Secure Workspace Link</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed px-2">
-                  This social provider is unconfigured in your Firebase Console. Enter your Workspace Security Key to verify and link a profile.
-                </p>
-              </div>
-
-              <form onSubmit={handleBypassSubmit} className="space-y-4 pt-2">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                    Select Target Profile
-                  </label>
-                  <select
-                    value={mockProfile}
-                    onChange={(e) => setMockProfile(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-[#070b14] focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-white text-xs"
-                  >
-                    <option value="ketan">Ketan Paswan (YouTube)</option>
-                    <option value="alex">Alex Carter (Instagram)</option>
-                    <option value="sam">Samantha Vlogs (Facebook)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                    Workspace Security Key
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showKey ? 'text' : 'password'}
-                      required
-                      placeholder="Enter security key..."
-                      value={securityKey}
-                      onChange={(e) => setSecurityKey(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-white text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowBypassModal(false);
-                      setSecurityKey('');
-                    }}
-                    className="flex-1 py-2.5 border dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl text-xs font-bold text-slate-500 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={syncing || !securityKey}
-                    className="flex-1 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
-                  >
-                    {syncing ? 'Verifying...' : 'Verify & Link'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
