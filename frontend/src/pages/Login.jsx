@@ -47,11 +47,24 @@ export default function Login() {
     }
   };
 
+  React.useEffect(() => {
+    const redirectErr = sessionStorage.getItem('authRedirectError');
+    if (redirectErr) {
+      sessionStorage.removeItem('authRedirectError');
+      if (redirectErr.toLowerCase().includes('register first') || redirectErr.toLowerCase().includes('not found') || redirectErr.toLowerCase().includes('not exist')) {
+        setShowRegisterAlert(true);
+      } else {
+        showNotification(redirectErr, 'error');
+      }
+    }
+  }, [showNotification]);
+
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
       const data = await googleOAuthLogin(false);
       if (data.success) {
+        if (data.redirecting) return;
         showNotification('Google login successful!', 'success');
         navigate('/');
       } else {

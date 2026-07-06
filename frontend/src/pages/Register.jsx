@@ -45,11 +45,20 @@ export default function Register() {
     }
   };
 
+  React.useEffect(() => {
+    const redirectErr = sessionStorage.getItem('authRedirectError');
+    if (redirectErr) {
+      sessionStorage.removeItem('authRedirectError');
+      showNotification(redirectErr, 'error');
+    }
+  }, [showNotification]);
+
   const handleGoogleRegister = async () => {
     setLoading(true);
     try {
       const data = await googleOAuthLogin(true);
       if (data.success) {
+        if (data.redirecting) return;
         showNotification('Registered & logged in with Google!', 'success');
         navigate('/');
       } else {

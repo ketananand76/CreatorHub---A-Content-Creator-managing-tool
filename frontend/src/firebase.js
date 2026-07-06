@@ -4,6 +4,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   sendEmailVerification,
   sendPasswordResetEmail,
@@ -27,7 +29,7 @@ const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-export { auth };
+export { auth, googleProvider, getRedirectResult };
 
 export const initFirebase = () => Promise.resolve(auth);
 
@@ -44,6 +46,9 @@ export const firebaseCreateWithEmail = async (email, password) => {
 
 export const firebaseSignInWithGoogle = () =>
   signInWithPopup(auth, googleProvider);
+
+export const firebaseSignInWithGoogleRedirect = () =>
+  signInWithRedirect(auth, googleProvider);
 
 export const firebasePasswordReset = (email) =>
   sendPasswordResetEmail(auth, email);

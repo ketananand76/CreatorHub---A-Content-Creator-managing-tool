@@ -4,6 +4,8 @@ import {
   firebaseSignInWithEmail,
   firebaseCreateWithEmail,
   firebaseSignInWithGoogle,
+  firebaseSignInWithGoogleRedirect,
+  getRedirectResult,
   firebaseSignOut,
   getIdToken
 } from '../firebase.js';
@@ -70,6 +72,45 @@ export const AuthProvider = ({ children }) => {
 
     initializeAuth();
   }, []);
+
+  // Handle Google Sign-In redirects (crucial for mobile devices)
+  useEffect(() => {
+    const handleRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+          setLoading(true);
+          const idToken = await getIdToken(result.user);
+          const isRegister = sessionStorage.getItem('isRegisterGoogle') === 'true';
+          sessionStorage.removeItem('isRegisterGoogle');
+
+          const res = await fetch(`${API_BASE}/auth/google-login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken, isRegister })
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            setUser(data.user);
+            setAccessToken(data.accessToken);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('refreshToken', data.refreshToken);
+          } else {
+            sessionStorage.setItem('authRedirectError', data.message || 'Google authentication failed');
+            window.location.reload();
+          }
+        }
+      } catch (err) {
+        console.error('Redirect sign-in error:', err);
+        sessionStorage.setItem('authRedirectError', 'Google auth failed. Please try again.');
+        window.location.reload();
+      } finally {
+        setLoading(false);
+      }
+    };
+    handleRedirect();
+  }, [API_BASE]);
 
   // Periodic token refresh every 10 minutes
   useEffect(() => {
@@ -269,9 +310,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Google Sign In via Firebase Popup → backend records user
+  // Google Sign In via Firebase Popup (desktop) or Redirect (mobile) → backend records user
   const googleOAuthLogin = async (isRegister = false) => {
     try {
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        sessionStorage.setItem('isRegisterGoogle', String(isRegister));
+        await firebaseSignInWithGoogleRedirect();
+        return { success: true, redirecting: true };
+      }
+
       const credential = await firebaseSignInWithGoogle();
       const idToken = await getIdToken(credential.user);
 
@@ -293,7 +342,7 @@ export const AuthProvider = ({ children }) => {
       console.error('Google Auth Error:', firebaseErr.code);
       return {
         success: false,
-        message: translateFirebaseError(firebaseErr.code)
+        message: translateFirebaseError(firebaseErr.code || firebaseErr.message)
       };
     }
   };
