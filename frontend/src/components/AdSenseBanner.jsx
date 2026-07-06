@@ -37,13 +37,12 @@ export default function AdSenseBanner({ type = 'banner' }) {
     containerRef.current.innerHTML = '';
     if (!adCode) return;
 
-    // Detect if we should render scripts (only on production approved hostnames)
-    const isDevOrRender = window.location.hostname === 'localhost' || 
-                          window.location.hostname === '127.0.0.1' || 
-                          window.location.hostname.includes('onrender.com');
+    // Detect if we are on local development machine
+    const isLocalDev = window.location.hostname === 'localhost' || 
+                       window.location.hostname === '127.0.0.1';
 
-    // If it's a mock or we are on production, inject the script
-    if (!isDevOrRender || !adCode.includes('ca-pub-')) {
+    // If we are not on local dev, inject the script directly
+    if (!isLocalDev) {
       const wrapper = document.createElement('div');
       wrapper.innerHTML = adCode;
       containerRef.current.appendChild(wrapper);
@@ -70,14 +69,13 @@ export default function AdSenseBanner({ type = 'banner' }) {
     return null;
   }
 
-  // Detect sandbox/local environment to render a beautiful preview card
-  const isDevOrRender = window.location.hostname === 'localhost' || 
-                        window.location.hostname === '127.0.0.1' || 
-                        window.location.hostname.includes('onrender.com');
+  // Only show mockup preview card on local machine development
+  const isLocalDev = window.location.hostname === 'localhost' || 
+                     window.location.hostname === '127.0.0.1';
 
   const hasAdSenseClient = adCode && adCode.includes('ca-pub-');
   
-  if (isDevOrRender && hasAdSenseClient) {
+  if (isLocalDev && hasAdSenseClient) {
     const pubMatch = adCode.match(/ca-pub-\d+/);
     const pubId = pubMatch ? pubMatch[0] : 'ca-pub-XXXXXXXXXXXXXXXX';
 
