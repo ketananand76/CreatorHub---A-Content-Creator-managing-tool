@@ -39,6 +39,8 @@ export default function SuperAdmin() {
   const [tickets, setTickets] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [creatorMetrics, setCreatorMetrics] = useState([]);
+  const [selectedCreatorMetrics, setSelectedCreatorMetrics] = useState(null);
 
   // Modal reply ticket state
   const [replyTicketId, setReplyTicketId] = useState(null);
@@ -94,6 +96,15 @@ export default function SuperAdmin() {
       const lbRes = await authFetch('/admin/performance/leaderboard');
       const lbData = await lbRes.json();
       if (lbData.success) setLeaderboard(lbData.leaderboard || []);
+
+      // Creator Metrics
+      try {
+        const cmRes = await authFetch('/social/admin/metrics');
+        const cmData = await cmRes.json();
+        if (cmData.success) setCreatorMetrics(cmData.metrics || []);
+      } catch (cmErr) {
+        console.error('Error fetching creator metrics:', cmErr);
+      }
     } catch (e) {
       console.error(e);
       showNotification('Admin reports failed to load', 'error');
@@ -295,6 +306,7 @@ export default function SuperAdmin() {
         {[
           { id: 'overview', label: 'Analytics System', icon: Activity },
           { id: 'leaderboard', label: 'Creator Standings', icon: Trophy },
+          { id: 'creatorMetrics', label: 'Creator Metrics', icon: Globe },
           { id: 'users', label: 'User Directory', icon: Users },
           { id: 'admins', label: 'Admin Profiles', icon: Lock },
           { id: 'broadcast', label: 'System Broadcasts', icon: MessageSquare },
@@ -477,6 +489,201 @@ export default function SuperAdmin() {
                   <Brain className="w-4 h-4" /> Run AI Performance Audit
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* --- TAB: CREATOR METRICS --- */}
+          {activeTab === 'creatorMetrics' && (
+            <div className="glass p-6 rounded-2xl border space-y-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b dark:border-slate-800">
+                <div>
+                  <h3 className="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-brand-500" />
+                    Aggregate Creator Analytics
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">Monitor connected social media metrics and live post views for all digital creators.</p>
+                </div>
+                <div className="px-3 py-1 bg-brand-500/10 text-brand-600 dark:text-brand-400 text-xs font-bold rounded-lg border border-brand-500/20">
+                  {creatorMetrics.length} Linked Creators
+                </div>
+              </div>
+
+              {/* Creator Metrics Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs min-w-[800px]">
+                  <thead>
+                    <tr className="border-b dark:border-slate-800 text-slate-400 font-bold uppercase">
+                      <th className="pb-3">Creator</th>
+                      <th className="pb-3">Connected Channels</th>
+                      <th className="pb-3">Total Followers</th>
+                      <th className="pb-3">Total Views</th>
+                      <th className="pb-3">Total Reach</th>
+                      <th className="pb-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y dark:divide-slate-800">
+                    {creatorMetrics.map(cm => (
+                      <tr key={cm.creatorId} className="hover:bg-slate-100/30 dark:hover:bg-slate-800/20">
+                        <td className="py-4">
+                          <span className="font-semibold text-slate-800 dark:text-white block">{cm.name}</span>
+                          <span className="text-[10px] text-slate-400 block mt-0.5">{cm.email}</span>
+                        </td>
+                        <td className="py-4">
+                          <div className="flex gap-1.5">
+                            {cm.accounts.map(acc => (
+                              <span
+                                key={acc.platform}
+                                className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${
+                                  acc.platform === 'youtube' ? 'bg-red-500/10 text-red-500 border-red-500/25' :
+                                  acc.platform === 'instagram' ? 'bg-pink-500/10 text-pink-500 border-pink-500/25' :
+                                  'bg-blue-500/10 text-blue-500 border-blue-500/25'
+                                }`}
+                                title={`@${acc.username}`}
+                              >
+                                {acc.platform}
+                              </span>
+                            ))}
+                            {cm.accounts.length === 0 && (
+                              <span className="text-slate-400 text-[10px] font-medium">None linked</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-4 font-bold font-mono text-slate-700 dark:text-slate-200">
+                          {cm.aggregateMetrics.followers.toLocaleString()}
+                        </td>
+                        <td className="py-4 font-bold font-mono text-slate-700 dark:text-slate-200">
+                          {cm.aggregateMetrics.views.toLocaleString()}
+                        </td>
+                        <td className="py-4 font-mono text-slate-500">
+                          {cm.aggregateMetrics.reach.toLocaleString()}
+                        </td>
+                        <td className="py-4 text-right">
+                          <button
+                            onClick={() => setSelectedCreatorMetrics(cm)}
+                            disabled={cm.accounts.length === 0}
+                            className="px-3 py-1.5 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:bg-slate-850 disabled:text-slate-500 text-white rounded-lg font-bold text-[10px] uppercase tracking-wider transition-colors"
+                          >
+                            Details
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {creatorMetrics.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="text-center py-8 text-slate-400">
+                          No creators registered or linked.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Drawer Modal for Detailed Statistics */}
+              <AnimatePresence>
+                {selectedCreatorMetrics && (
+                  <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <motion.div
+                      initial={{ scale: 0.95, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.95, opacity: 0 }}
+                      className="bg-white dark:bg-[#0e1322] border dark:border-slate-800 rounded-3xl max-w-4xl w-full p-6 space-y-6 shadow-xl relative max-h-[90vh] overflow-y-auto"
+                    >
+                      <div className="flex justify-between items-start border-b dark:border-slate-800 pb-4">
+                        <div>
+                          <h3 className="text-lg font-bold font-outfit text-slate-800 dark:text-white">
+                            {selectedCreatorMetrics.name}'s Social Statistics
+                          </h3>
+                          <p className="text-xs text-slate-400 mt-0.5">{selectedCreatorMetrics.email}</p>
+                        </div>
+                        <button
+                          onClick={() => setSelectedCreatorMetrics(null)}
+                          className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-500 dark:text-slate-400"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="p-4 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border dark:border-slate-800">
+                          <span className="text-[10px] font-bold text-slate-400 block uppercase">Total Channels Followers</span>
+                          <span className="text-xl font-black mt-1 font-mono block dark:text-white">
+                            {selectedCreatorMetrics.aggregateMetrics.followers.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="p-4 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border dark:border-slate-800">
+                          <span className="text-[10px] font-bold text-slate-400 block uppercase">Total Channel Views</span>
+                          <span className="text-xl font-black mt-1 font-mono block dark:text-white">
+                            {selectedCreatorMetrics.aggregateMetrics.views.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="p-4 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border dark:border-slate-800">
+                          <span className="text-[10px] font-bold text-slate-400 block uppercase">Total Network Reach</span>
+                          <span className="text-xl font-black mt-1 font-mono block dark:text-white">
+                            {selectedCreatorMetrics.aggregateMetrics.reach.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <h4 className="font-bold text-sm text-slate-800 dark:text-white">Recent Posts / Videos & Reels</h4>
+                        <div className="overflow-x-auto border dark:border-slate-800 rounded-2xl">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-slate-50 dark:bg-slate-900/40 border-b dark:border-slate-800 text-slate-400 font-bold uppercase">
+                                <th className="p-3">Title / Caption</th>
+                                <th className="p-3">Platform</th>
+                                <th className="p-3">Views</th>
+                                <th className="p-3">Reach</th>
+                                <th className="p-3">Likes</th>
+                                <th className="p-3">Comments</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y dark:divide-slate-800">
+                              {selectedCreatorMetrics.accounts.flatMap(acc =>
+                                (acc.items || []).map((item, idx) => (
+                                  <tr key={idx} className="hover:bg-slate-100/10 dark:hover:bg-slate-800/10">
+                                    <td className="p-3 font-semibold dark:text-white max-w-xs truncate">{item.title}</td>
+                                    <td className="p-3">
+                                      <span className={`px-2.5 py-0.5 rounded-full font-black uppercase text-[8px] border ${
+                                        acc.platform === 'youtube' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                                        acc.platform === 'instagram' ? 'bg-pink-500/10 text-pink-500 border-pink-500/20' :
+                                        'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                                      }`}>
+                                        {acc.platform}
+                                      </span>
+                                    </td>
+                                    <td className="p-3 font-bold font-mono dark:text-slate-200">{item.views.toLocaleString()}</td>
+                                    <td className="p-3 font-mono text-slate-400">{item.reach.toLocaleString()}</td>
+                                    <td className="p-3 text-slate-500">{item.likes.toLocaleString()}</td>
+                                    <td className="p-3 text-slate-500">{item.comments.toLocaleString()}</td>
+                                  </tr>
+                                ))
+                              )}
+                              {selectedCreatorMetrics.accounts.every(acc => !acc.items || acc.items.length === 0) && (
+                                <tr>
+                                  <td colSpan={6} className="text-center py-6 text-slate-400">
+                                    No posts recorded for this creator.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end pt-2 border-t dark:border-slate-800">
+                        <button
+                          onClick={() => setSelectedCreatorMetrics(null)}
+                          className="px-5 py-2 border dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-xs font-bold text-slate-500"
+                        >
+                          Close Details
+                        </button>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>
             </div>
           )}
 

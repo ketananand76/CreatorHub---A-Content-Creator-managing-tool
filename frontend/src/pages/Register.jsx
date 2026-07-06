@@ -4,10 +4,10 @@ import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { motion } from 'framer-motion';
 import Logo from '../components/Logo';
-import { Mail, Lock, User, UserCheck, Shield, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, UserCheck, Shield, Eye, EyeOff, Youtube, Facebook, Instagram } from 'lucide-react';
 
 export default function Register() {
-  const { register, googleOAuthLogin } = useAuth();
+  const { register, socialLoginSuccess } = useAuth();
   const { showNotification } = useNotification();
   const navigate = useNavigate();
 
@@ -53,22 +53,33 @@ export default function Register() {
     }
   }, [showNotification]);
 
-  const handleGoogleRegister = async () => {
-    setLoading(true);
-    try {
-      const data = await googleOAuthLogin(true);
-      if (data.success) {
-        if (data.redirecting) return;
-        showNotification('Registered & logged in with Google!', 'success');
-        navigate('/');
-      } else {
-        showNotification(data.message || 'Google sign-up failed', 'error');
+  const handleSocialRegister = (platform) => {
+    const width = 600;
+    const height = 700;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+
+    const popup = window.open(
+      `/social-auth-popup?platform=${platform}&isRegister=true`,
+      'Authorize CreatorHub',
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+
+    const handleMessage = (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'social-auth-success') {
+        const { data } = event.data;
+        if (data.success) {
+          socialLoginSuccess(data);
+          showNotification(`Successfully registered via ${platform.charAt(0).toUpperCase() + platform.slice(1)}!`, 'success');
+          navigate('/');
+        } else {
+          showNotification(data.message || 'Social registration failed', 'error');
+        }
+        window.removeEventListener('message', handleMessage);
       }
-    } catch (err) {
-      showNotification('Google auth failed', 'error');
-    } finally {
-      setLoading(false);
-    }
+    };
+    window.addEventListener('message', handleMessage);
   };
 
   return (
@@ -200,21 +211,38 @@ export default function Register() {
           <div className="relative flex justify-center text-xs uppercase"><span className="bg-slate-50 dark:bg-dark-card px-2 text-slate-400">Or Register With</span></div>
         </div>
 
-        {/* Mock Google Login */}
-        <button
-          type="button"
-          onClick={handleGoogleRegister}
-          disabled={loading}
-          className="w-full py-3 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-xl font-bold text-sm text-slate-700 dark:text-slate-300 transition-all flex items-center justify-center gap-2"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24">
-            <path fill="#ea4335" d="M12 5.04c1.62 0 3.08.56 4.22 1.65l3.15-3.15C17.45 1.68 14.93 1 12 1 7.35 1 3.4 3.65 1.57 7.5l3.86 3C6.35 7.57 8.93 5.04 12 5.04z" />
-            <path fill="#4285f4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.28 1.48-1.12 2.74-2.38 3.58l3.69 2.87c2.16-1.99 3.42-4.93 3.42-8.6z" />
-            <path fill="#fbbc05" d="M5.43 13.5c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.57 5.94C.57 7.94 0 10.15 0 12.5s.57 4.56 1.57 6.56l3.86-3.06z" />
-            <path fill="#34a853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.69-2.87c-1.02.68-2.33 1.09-4.27 1.09-3.07 0-5.65-2.53-6.57-5.46l-3.86 3C3.4 20.35 7.35 23 12 23z" />
-          </svg>
-          {loading ? 'Signing up...' : 'Register with Google'}
-        </button>
+        {/* Social Logins */}
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => handleSocialRegister('youtube')}
+            disabled={loading}
+            className="w-full py-3 border border-red-200 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-950/15 rounded-xl font-bold text-sm text-red-600 dark:text-red-400 transition-all flex items-center justify-center gap-2"
+          >
+            <Youtube className="w-4 h-4" />
+            Register with YouTube
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSocialRegister('instagram')}
+            disabled={loading}
+            className="w-full py-3 border border-pink-200 dark:border-pink-900/30 hover:bg-pink-50 dark:hover:bg-pink-950/15 rounded-xl font-bold text-sm text-pink-600 dark:text-pink-400 transition-all flex items-center justify-center gap-2"
+          >
+            <Instagram className="w-4 h-4" />
+            Register with Instagram
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSocialRegister('facebook')}
+            disabled={loading}
+            className="w-full py-3 border border-blue-200 dark:border-blue-900/30 hover:bg-blue-50 dark:hover:bg-blue-950/15 rounded-xl font-bold text-sm text-blue-600 dark:text-blue-400 transition-all flex items-center justify-center gap-2"
+          >
+            <Facebook className="w-4 h-4" />
+            Register with Facebook
+          </button>
+        </div>
 
         <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-6">
           Already have an account?{' '}

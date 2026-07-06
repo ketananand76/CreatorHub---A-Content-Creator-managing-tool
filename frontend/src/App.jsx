@@ -19,6 +19,8 @@ import Subscription from './pages/Subscription';
 import SuperAdmin from './pages/SuperAdmin';
 import Support from './pages/Support';
 import SettingsPage from './pages/SettingsPage';
+import SocialTracker from './pages/SocialTracker';
+import SocialAuthPopup from './pages/SocialAuthPopup';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -83,6 +85,7 @@ const AppLayout = () => {
             <Route path="/subscription" element={<Subscription />} />
             <Route path="/support" element={<Support />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/tracker" element={<SocialTracker />} />
             <Route
               path="/admin"
               element={
@@ -113,6 +116,7 @@ export default function App() {
               <Route path="/forgot-password" element={<ResetPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/admin-login" element={<AdminLogin />} />
+              <Route path="/social-auth-popup" element={<SocialAuthPopup />} />
 
               {/* Protected Workspace Layout */}
               <Route

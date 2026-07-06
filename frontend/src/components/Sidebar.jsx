@@ -20,7 +20,8 @@ import {
   Moon,
   LifeBuoy,
   Settings,
-  X
+  X,
+  Globe
 } from 'lucide-react';
 
 export default function Sidebar({ mobileSidebarOpen, setMobileSidebarOpen }) {
@@ -47,6 +48,7 @@ export default function Sidebar({ mobileSidebarOpen, setMobileSidebarOpen }) {
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['Creator', 'Team Member'] },
+    { path: '/tracker', label: 'Live Metrics Tracker', icon: Globe, roles: ['Creator'] },
     { path: '/calendar', label: 'Content Calendar', icon: Calendar, roles: ['Creator', 'Team Member'] },
     { path: '/crm', label: 'Brand CRM', icon: Layers, roles: ['Creator'] },
     { path: '/earnings', label: 'Earnings Tracker', icon: DollarSign, roles: ['Creator'] },

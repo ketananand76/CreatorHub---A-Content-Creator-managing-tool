@@ -155,6 +155,18 @@ export default function SettingsPage() {
 
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                Email Address (Read-only)
+              </label>
+              <input
+                type="email"
+                readOnly
+                value={user?.email || ''}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs outline-none text-slate-500 cursor-not-allowed"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                 Channel / Creator Bio
               </label>
               <textarea

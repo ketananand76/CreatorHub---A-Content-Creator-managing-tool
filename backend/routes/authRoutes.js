@@ -3,7 +3,7 @@ import {
   register,
   verifyOTP,
   login,
-  googleLogin,
+  socialLogin,
   refreshToken,
   setup2FA,
   verify2FA,
@@ -12,19 +12,17 @@ import {
   resetPassword,
   resendOTP,
   getProfile,
-  updateProfile,
-  getFirebaseConfig
+  updateProfile
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.get('/firebase-config', getFirebaseConfig);
 router.post('/register', register);
 router.post('/verify-otp', verifyOTP);
 router.post('/resend-otp', resendOTP);
 router.post('/login', login);
-router.post('/google-login', googleLogin);
+router.post('/social-login', socialLogin);
 router.post('/refresh-token', refreshToken);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);

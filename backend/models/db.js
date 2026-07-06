@@ -141,6 +141,29 @@ const NotificationSchema = new mongoose.Schema({
   isReadBy: [{ type: String }] // Array of userIds who read it (for broadcasts)
 }, { timestamps: true });
 
+const SocialAccountSchema = new mongoose.Schema({
+  userId: { type: String, required: true },
+  platform: { type: String, enum: ['instagram', 'facebook', 'youtube'], required: true },
+  connected: { type: Boolean, default: true },
+  username: { type: String },
+  displayName: { type: String },
+  profilePicture: { type: String },
+  followersCount: { type: Number, default: 0 },
+  totalViews: { type: Number, default: 0 },
+  totalReach: { type: Number, default: 0 },
+  items: [{
+    itemId: { type: String }, // videoId or postId
+    title: { type: String },  // title or caption/message
+    type: { type: String },   // 'post', 'reel', 'video'
+    views: { type: Number, default: 0 },
+    reach: { type: Number, default: 0 },
+    likes: { type: Number, default: 0 },
+    comments: { type: Number, default: 0 },
+    url: { type: String },
+    publishedAt: { type: Date }
+  }]
+}, { timestamps: true });
+
 const MongoUser = useMongo ? mongoose.model('User', UserSchema) : null;
 const MongoCalendarEvent = useMongo ? mongoose.model('CalendarEvent', CalendarEventSchema) : null;
 const MongoBrandDeal = useMongo ? mongoose.model('BrandDeal', BrandDealSchema) : null;
@@ -152,6 +175,7 @@ const MongoTicket = useMongo ? mongoose.model('Ticket', TicketSchema) : null;
 const MongoIncomeExpense = useMongo ? mongoose.model('IncomeExpense', IncomeExpenseSchema) : null;
 const MongoSystemSettings = useMongo ? mongoose.model('SystemSettings', SystemSettingsSchema) : null;
 const MongoNotification = useMongo ? mongoose.model('Notification', NotificationSchema) : null;
+const MongoSocialAccount = useMongo ? mongoose.model('SocialAccount', SocialAccountSchema) : null;
 
 // JSON Model Fallbacks
 const JsonUser = getJsonModel('User');
@@ -165,6 +189,7 @@ const JsonTicket = getJsonModel('Ticket');
 const JsonIncomeExpense = getJsonModel('IncomeExpense');
 const JsonSystemSettings = getJsonModel('SystemSettings');
 const JsonNotification = getJsonModel('Notification');
+const JsonSocialAccount = getJsonModel('SocialAccount');
 
 // Wrapper creator
 const createModelWrapper = (mongoModel, jsonModel) => {
@@ -225,4 +250,5 @@ export const Ticket = createModelWrapper(MongoTicket, JsonTicket);
 export const IncomeExpense = createModelWrapper(MongoIncomeExpense, JsonIncomeExpense);
 export const SystemSettings = createModelWrapper(MongoSystemSettings, JsonSystemSettings);
 export const Notification = createModelWrapper(MongoNotification, JsonNotification);
+export const SocialAccount = createModelWrapper(MongoSocialAccount, JsonSocialAccount);
 export { useMongo };

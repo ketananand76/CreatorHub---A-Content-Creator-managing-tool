@@ -126,54 +126,13 @@ const sendOTPEmail = async (email, otp) => {
   }
 };
 
-const verifyFirebaseToken = async (idToken) => {
-  const apiKey = FIREBASE_API_KEY;
-  if (!apiKey) {
-    throw new Error('Firebase API Key is not configured on the server.');
-  }
-
-  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ idToken })
-  });
-
-  const data = await response.json();
-  if (data.error) {
-    throw new Error(data.error.message || 'Firebase token verification failed.');
-  }
-
-  if (!data.users || data.users.length === 0) {
-    throw new Error('No user profile found for this token.');
-  }
-
-  return data.users[0]; // Returns { email, emailVerified, displayName, localId }
-};
-
-export const getFirebaseConfig = (req, res) => {
-  res.status(200).json({
-    success: true,
-    config: {
-      apiKey: process.env.FIREBASE_API_KEY,
-      authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-      appId: process.env.FIREBASE_APP_ID
-    }
-  });
-};
-
 export const register = async (req, res) => {
   try {
-    const { idToken, name, role } = req.body;
+    const { name, email, password, role } = req.body;
 
-    if (!idToken) {
-      return res.status(400).json({ success: false, message: 'Firebase authentication token is required.' });
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, message: 'Name, email, and password are required.' });
     }
-
-    const decodedToken = await verifyFirebaseToken(idToken);
-    const email = decodedToken.email;
 
     const reservedAdminEmail = (process.env.ADMIN_EMAIL?.trim() || 'ketanpaswan53@gmail.com').toLowerCase();
     if (email.toLowerCase() === reservedAdminEmail) {
@@ -188,48 +147,36 @@ export const register = async (req, res) => {
       return res.status(400).json({ success: false, message: 'User already exists' });
     }
 
-    const randPassword = Math.random().toString(36).substring(2, 15);
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(randPassword, salt);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
     let userRole = 'Creator';
     if (role === 'Team Member') {
       userRole = 'Team Member';
     }
 
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+
     const newUser = await User.create({
-      name: name || decodedToken.displayName || email.split('@')[0],
+      name,
       email,
       password: hashedPassword,
       role: userRole,
-      isVerified: decodedToken.emailVerified,
+      isVerified: false,
+      otp,
+      otpExpires,
       status: 'active'
     });
 
-    if (!decodedToken.emailVerified) {
-      return res.status(200).json({
-        success: true,
-        requiresVerification: true,
-        message: 'Registration successful. Please verify your email using the link sent to your inbox.',
-        tempUserId: newUser._id || newUser.id
-      });
-    }
-
-    const { accessToken, refreshToken } = generateTokens(newUser);
+    await sendOTPEmail(email, otp);
 
     res.status(201).json({
       success: true,
-      message: 'Registration completed successfully.',
-      accessToken,
-      refreshToken,
-      user: {
-        id: newUser._id || newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
-        isPremium: newUser.isPremium,
-        isTwoFAEnabled: newUser.isTwoFAEnabled
-      }
+      requiresVerification: true,
+      message: 'Registration successful. Please verify your email using the 6-digit OTP code sent to your inbox.',
+      email: newUser.email,
+      simulatedOTP: otp
     });
   } catch (error) {
     console.error('Registration Error:', error);
@@ -239,27 +186,28 @@ export const register = async (req, res) => {
 
 export const verifyOTP = async (req, res) => {
   try {
-    const { idToken } = req.body;
-    if (!idToken) {
-      return res.status(400).json({ success: false, message: 'Authentication token is required' });
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, message: 'Email and OTP are required' });
     }
 
-    const decodedToken = await verifyFirebaseToken(idToken);
-    if (!decodedToken.emailVerified) {
-      return res.status(400).json({ success: false, message: 'Your email address is not verified yet. Please check your inbox for verification link.' });
-    }
-
-    const user = await User.findOneAndUpdate(
-      { email: decodedToken.email },
-      { isVerified: true },
-      { new: true }
-    );
+    const user = await User.findOne({ email });
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'User record not found.' });
     }
 
-    const { accessToken, refreshToken } = generateTokens(user);
+    if (user.otp !== otp || new Date(user.otpExpires) < new Date()) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP code' });
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { email },
+      { isVerified: true, otp: null, otpExpires: null },
+      { new: true }
+    );
+
+    const { accessToken, refreshToken } = generateTokens(updatedUser);
 
     res.status(200).json({
       success: true,
@@ -267,12 +215,12 @@ export const verifyOTP = async (req, res) => {
       accessToken,
       refreshToken,
       user: {
-        id: user._id || user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isPremium: user.isPremium,
-        isTwoFAEnabled: user.isTwoFAEnabled
+        id: updatedUser._id || updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        isPremium: updatedUser.isPremium,
+        isTwoFAEnabled: updatedUser.isTwoFAEnabled
       }
     });
   } catch (error) {
@@ -283,25 +231,18 @@ export const verifyOTP = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
-    const { idToken, isAdminLogin, email: providedEmail, password: providedPassword } = req.body;
+    const { email: providedEmail, password: providedPassword, isAdminLogin } = req.body;
 
-    let decodedToken = null;
-    let email = providedEmail || '';
-
-    if (idToken) {
-      decodedToken = await verifyFirebaseToken(idToken);
-      email = decodedToken.email;
-    } else if (providedEmail && providedPassword) {
-      email = providedEmail;
-    } else {
-      return res.status(400).json({ success: false, message: 'Authentication token or credentials are required' });
+    if (!providedEmail || !providedPassword) {
+      return res.status(400).json({ success: false, message: 'Email and password are required' });
     }
 
+    const email = providedEmail.toLowerCase();
     let user = await User.findOne({ email });
 
     const adminEmail = (process.env.ADMIN_EMAIL?.trim() || 'ketanpaswan53@gmail.com').toLowerCase();
     const adminPassword = process.env.ADMIN_PASSWORD?.trim() || 'Ketan@123';
-    const isDirectAdminLogin = email.toLowerCase() === adminEmail && providedPassword === adminPassword;
+    const isDirectAdminLogin = email === adminEmail && providedPassword === adminPassword;
 
     if (isDirectAdminLogin) {
       if (!user) {
@@ -321,24 +262,8 @@ export const login = async (req, res) => {
       }
     }
 
-    // Seed Ketan Paswan Admin on-the-fly if logging in for the first time via Firebase
     if (!user) {
-      if (email.toLowerCase() === adminEmail) {
-        const randPassword = Math.random().toString(36).substring(2, 15);
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(randPassword, salt);
-
-        user = await User.create({
-          name: 'Super Admin',
-          email: adminEmail,
-          password: hashedPassword,
-          role: 'Super Admin',
-          isVerified: true,
-          status: 'active'
-        });
-      } else {
-        return res.status(404).json({ success: false, message: 'User account not found. Please register first.' });
-      }
+      return res.status(404).json({ success: false, message: 'User account not found. Please register first.' });
     }
 
     if (isDirectAdminLogin) {
@@ -364,35 +289,28 @@ export const login = async (req, res) => {
       }
     }
 
-    if (providedEmail && providedPassword) {
-      if (user.role !== 'Admin' && user.role !== 'Super Admin') {
-        return res.status(403).json({
-          success: false,
-          message: 'Access Denied: Direct credential login is restricted to administrator accounts.'
-        });
-      }
-      const passwordMatch = await bcrypt.compare(providedPassword, user.password);
-      if (!passwordMatch) {
-        return res.status(401).json({ success: false, message: 'Incorrect password.' });
-      }
+    const passwordMatch = await bcrypt.compare(providedPassword, user.password);
+    if (!passwordMatch) {
+      return res.status(401).json({ success: false, message: 'Incorrect password.' });
     }
 
     if (user.status === 'suspended' || user.status === 'banned') {
       return res.status(403).json({ success: false, message: `Your account is ${user.status}. Contact support.` });
     }
 
-    if (decodedToken && !decodedToken.emailVerified) {
+    if (!user.isVerified) {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+      await User.findByIdAndUpdate(user._id || user.id, { otp, otpExpires });
+      await sendOTPEmail(user.email, otp);
+
       return res.status(200).json({
         success: false,
         requiresVerification: true,
         message: 'Account is not verified. Please check your email inbox.',
-        email: user.email
+        email: user.email,
+        simulatedOTP: otp
       });
-    }
-
-    // Sync verification status
-    if (!user.isVerified) {
-      await User.findByIdAndUpdate(user._id || user.id, { isVerified: true });
     }
 
     // Track Session
@@ -439,59 +357,172 @@ export const login = async (req, res) => {
   }
 };
 
-export const googleLogin = async (req, res) => {
+export const socialLogin = async (req, res) => {
   try {
-    const { idToken, isRegister } = req.body;
+    const { platform, email, name, socialId, profilePicture } = req.body;
 
-    if (!idToken) {
-      return res.status(400).json({ success: false, message: 'Google authentication failed: missing token' });
+    if (!platform || !socialId || !name) {
+      return res.status(400).json({ success: false, message: 'Platform, social ID, and name are required' });
     }
 
-    const decodedToken = await verifyFirebaseToken(idToken);
-    const email = decodedToken.email;
-    const name = decodedToken.displayName || email.split('@')[0];
+    const targetEmail = email ? email.toLowerCase() : `${platform}_${socialId}@creatorhub.mock`;
 
-    // Seed Ketan Paswan if logging in for the first time via Google Firebase Auth
-    if (email.toLowerCase() === 'ketanpaswan53@gmail.com') {
-      let adminUser = await User.findOne({ email });
-      if (!adminUser) {
-        const randPassword = Math.random().toString(36).substring(2, 15);
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(randPassword, salt);
-        
-        await User.create({
-          name: 'Super Admin',
-          email,
-          password: hashedPassword,
-          role: 'Super Admin',
-          isVerified: true,
-          status: 'active'
-        });
-      }
+    let user = await User.findOne({ email: targetEmail });
+    
+    // Also search by name if email is generated/mock
+    if (!user && targetEmail.endsWith('@creatorhub.mock')) {
+      const allUsers = await User.find({ role: 'Creator' });
+      user = allUsers.find(u => u.name === name);
     }
 
-    let user = await User.findOne({ email });
     if (!user) {
-      if (isRegister) {
-        const randPassword = Math.random().toString(36).substring(2, 15);
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(randPassword, salt);
+      const randPassword = Math.random().toString(36).substring(2, 15);
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(randPassword, salt);
 
-        user = await User.create({
-          name,
-          email,
-          password: hashedPassword,
-          isVerified: true, // Google accounts verified by default
-          role: 'Creator',
-          status: 'active'
-        });
-      } else {
-        return res.status(404).json({ success: false, message: 'User account not found. Please register first.' });
+      user = await User.create({
+        name,
+        email: targetEmail,
+        password: hashedPassword,
+        role: 'Creator',
+        isVerified: true, // Social logins are verified immediately
+        status: 'active'
+      });
+    }
+
+    // Ensure they have this social account registered
+    const { SocialAccount } = await import('../models/db.js');
+    let socialAcc = await SocialAccount.findOne({ platform, userId: user._id || user.id });
+
+    if (!socialAcc) {
+      let followersCount = 0;
+      let totalViews = 0;
+      let totalReach = 0;
+      let items = [];
+
+      if (platform === 'youtube') {
+        followersCount = Math.floor(10000 + Math.random() * 500000);
+        totalViews = followersCount * Math.floor(15 + Math.random() * 80);
+        totalReach = totalViews * 3;
+        items = [
+          {
+            itemId: 'yt_' + Math.random().toString(36).substring(2, 7),
+            title: `My First Week as a Fulltime Creator! 🎥`,
+            type: 'video',
+            views: Math.floor(followersCount * 0.3),
+            reach: Math.floor(followersCount * 1.2),
+            likes: Math.floor(followersCount * 0.03),
+            comments: Math.floor(followersCount * 0.005),
+            publishedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+          },
+          {
+            itemId: 'yt_' + Math.random().toString(36).substring(2, 7),
+            title: `Ultimate Setup Tour 2026! 🚀 Minimalist Vibes`,
+            type: 'video',
+            views: Math.floor(followersCount * 0.85),
+            reach: Math.floor(followersCount * 3.4),
+            likes: Math.floor(followersCount * 0.09),
+            comments: Math.floor(followersCount * 0.015),
+            publishedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
+          },
+          {
+            itemId: 'yt_' + Math.random().toString(36).substring(2, 7),
+            title: `How I edit my videos in under 10 minutes`,
+            type: 'video',
+            views: Math.floor(followersCount * 0.5),
+            reach: Math.floor(followersCount * 2.0),
+            likes: Math.floor(followersCount * 0.05),
+            comments: Math.floor(followersCount * 0.008),
+            publishedAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000)
+          }
+        ];
+      } else if (platform === 'instagram') {
+        followersCount = Math.floor(5000 + Math.random() * 300000);
+        totalViews = followersCount * Math.floor(10 + Math.random() * 40);
+        totalReach = totalViews * 2.5;
+        items = [
+          {
+            itemId: 'ig_' + Math.random().toString(36).substring(2, 7),
+            title: `A day in the life of a digital marketer 💻✨`,
+            type: 'reel',
+            views: Math.floor(followersCount * 1.5),
+            reach: Math.floor(followersCount * 4.5),
+            likes: Math.floor(followersCount * 0.12),
+            comments: Math.floor(followersCount * 0.02),
+            publishedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+          },
+          {
+            itemId: 'ig_' + Math.random().toString(36).substring(2, 7),
+            title: `Stop doing these 3 editing mistakes! ❌`,
+            type: 'reel',
+            views: Math.floor(followersCount * 0.9),
+            reach: Math.floor(followersCount * 2.7),
+            likes: Math.floor(followersCount * 0.08),
+            comments: Math.floor(followersCount * 0.012),
+            publishedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000)
+          },
+          {
+            itemId: 'ig_' + Math.random().toString(36).substring(2, 7),
+            title: `Aesthetic office vibes today ☕🌧️`,
+            type: 'post',
+            views: Math.floor(followersCount * 0.25),
+            reach: Math.floor(followersCount * 0.8),
+            likes: Math.floor(followersCount * 0.04),
+            comments: Math.floor(followersCount * 0.005),
+            publishedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000)
+          }
+        ];
+      } else if (platform === 'facebook') {
+        followersCount = Math.floor(2000 + Math.random() * 150000);
+        totalViews = followersCount * Math.floor(5 + Math.random() * 20);
+        totalReach = totalViews * 2.0;
+        items = [
+          {
+            itemId: 'fb_' + Math.random().toString(36).substring(2, 7),
+            title: `Excited to announce my new partnership with CreatorHub! 🎉`,
+            type: 'post',
+            views: Math.floor(followersCount * 0.15),
+            reach: Math.floor(followersCount * 0.5),
+            likes: Math.floor(followersCount * 0.02),
+            comments: Math.floor(followersCount * 0.003),
+            publishedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000)
+          },
+          {
+            itemId: 'fb_' + Math.random().toString(36).substring(2, 7),
+            title: `Which editing setup is better: Left or Right? 🖥️`,
+            type: 'post',
+            views: Math.floor(followersCount * 0.35),
+            reach: Math.floor(followersCount * 1.1),
+            likes: Math.floor(followersCount * 0.04),
+            comments: Math.floor(followersCount * 0.008),
+            publishedAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000)
+          }
+        ];
       }
-    } else {
-      if (isRegister) {
-        return res.status(400).json({ success: false, message: 'An account with this email already exists. Please login instead.' });
+
+      socialAcc = await SocialAccount.create({
+        userId: user._id || user.id,
+        platform,
+        connected: true,
+        username: socialId,
+        displayName: name,
+        profilePicture: profilePicture || '',
+        followersCount,
+        totalViews,
+        totalReach,
+        items
+      });
+
+      // Sync summary metrics to User record
+      const updateData = {};
+      if (platform === 'youtube') {
+        updateData.youtubeSubscribers = followersCount;
+        updateData.youtubeLink = `https://youtube.com/@${socialId}`;
+      } else if (platform === 'instagram') {
+        updateData.instagramFollowers = followersCount;
+        updateData.instagramLink = `https://instagram.com/${socialId}`;
       }
+      await User.findByIdAndUpdate(user._id || user.id, updateData);
     }
 
     if (user.status === 'suspended' || user.status === 'banned') {
@@ -503,15 +534,15 @@ export const googleLogin = async (req, res) => {
       email: user.email,
       ipAddress: req.ip || '127.0.0.1',
       device: /mobile/i.test(req.headers['user-agent']) ? 'Mobile' : 'Desktop',
-      browser: 'Google Integration (Firebase)',
-      action: 'Google Login'
+      browser: `${platform} OAuth Integration`,
+      action: `${platform} Social Login`
     });
 
     const { accessToken, refreshToken } = generateTokens(user);
 
     res.status(200).json({
       success: true,
-      message: 'Google login successful',
+      message: `${platform} login successful`,
       accessToken,
       refreshToken,
       user: {
@@ -525,7 +556,7 @@ export const googleLogin = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Google Login Error:', error);
+    console.error('Social Login Error:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };
