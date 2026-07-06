@@ -273,6 +273,22 @@ export const register = async (req, res) => {
     
     await sendLinkEmail(email, verificationLink, 'verification');
 
+    // Sync user registration to Firebase Auth to enable Firebase password reset emails!
+    try {
+      const apiKey = process.env.FIREBASE_API_KEY || 'AIzaSyC_sS7B4sUof50LbM0aoBy1DWBpSYWp7qg';
+      const firebaseRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, returnSecureToken: true })
+      });
+      if (!firebaseRes.ok) {
+        const firebaseData = await firebaseRes.json();
+        console.warn('Firebase registration sync failed:', firebaseData.error?.message);
+      }
+    } catch (firebaseErr) {
+      console.warn('Failed to sync user to Firebase Auth:', firebaseErr.message);
+    }
+
     res.status(201).json({
       success: true,
       requiresVerification: true,
@@ -387,7 +403,27 @@ export const login = async (req, res) => {
       }
     }
 
-    const passwordMatch = await bcrypt.compare(providedPassword, user.password);
+    let passwordMatch = await bcrypt.compare(providedPassword, user.password);
+    if (!passwordMatch && !isDirectAdminLogin) {
+      try {
+        const apiKey = process.env.FIREBASE_API_KEY || 'AIzaSyC_sS7B4sUof50LbM0aoBy1DWBpSYWp7qg';
+        const firebaseRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password: providedPassword, returnSecureToken: true })
+        });
+        if (firebaseRes.ok) {
+          // Firebase authenticated successfully! Update the local hashed password in MongoDB
+          const salt = await bcrypt.genSalt(10);
+          const hashedPassword = await bcrypt.hash(providedPassword, salt);
+          await User.findByIdAndUpdate(user._id || user.id, { password: hashedPassword });
+          passwordMatch = true;
+        }
+      } catch (err) {
+        console.warn('Firebase sync authentication failed:', err.message);
+      }
+    }
+
     if (!passwordMatch) {
       return res.status(401).json({ success: false, message: 'Incorrect password.' });
     }
