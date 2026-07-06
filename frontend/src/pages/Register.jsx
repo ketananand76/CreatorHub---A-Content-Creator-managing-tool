@@ -5,9 +5,10 @@ import { useNotification } from '../context/NotificationContext';
 import { motion } from 'framer-motion';
 import Logo from '../components/Logo';
 import { Mail, Lock, User, UserCheck, Shield, Eye, EyeOff, Youtube, Facebook, Instagram } from 'lucide-react';
+import { firebaseSignInWithGoogle, firebaseSignInWithFacebook, getIdToken } from '../firebase.js';
 
 export default function Register() {
-  const { register, socialLoginSuccess } = useAuth();
+  const { register, socialLogin } = useAuth();
   const { showNotification } = useNotification();
   const navigate = useNavigate();
 
@@ -53,33 +54,30 @@ export default function Register() {
     }
   }, [showNotification]);
 
-  const handleSocialRegister = (platform) => {
-    const width = 600;
-    const height = 700;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
-
-    const popup = window.open(
-      `/social-auth-popup?platform=${platform}&isRegister=true`,
-      'Authorize CreatorHub',
-      `width=${width},height=${height},left=${left},top=${top}`
-    );
-
-    const handleMessage = (event) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type === 'social-auth-success') {
-        const { data } = event.data;
-        if (data.success) {
-          socialLoginSuccess(data);
-          showNotification(`Successfully registered via ${platform.charAt(0).toUpperCase() + platform.slice(1)}!`, 'success');
-          navigate('/');
-        } else {
-          showNotification(data.message || 'Social registration failed', 'error');
-        }
-        window.removeEventListener('message', handleMessage);
+  const handleSocialRegister = async (platform) => {
+    setLoading(true);
+    try {
+      let credential;
+      if (platform === 'youtube') {
+        credential = await firebaseSignInWithGoogle();
+      } else {
+        credential = await firebaseSignInWithFacebook();
       }
-    };
-    window.addEventListener('message', handleMessage);
+      const idToken = await getIdToken(credential.user);
+      
+      const data = await socialLogin(platform, idToken);
+      if (data.success) {
+        showNotification(`Successfully registered via ${platform.charAt(0).toUpperCase() + platform.slice(1)}!`, 'success');
+        navigate('/');
+      } else {
+        showNotification(data.message || 'Social registration failed', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification('Social registration was cancelled or failed.', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

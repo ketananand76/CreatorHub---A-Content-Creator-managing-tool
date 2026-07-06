@@ -5,9 +5,10 @@ import { useNotification } from '../context/NotificationContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import Logo from '../components/Logo';
 import { Mail, Lock, Eye, EyeOff, Shield, Youtube, Facebook, Instagram } from 'lucide-react';
+import { firebaseSignInWithGoogle, firebaseSignInWithFacebook, getIdToken } from '../firebase.js';
 
 export default function Login() {
-  const { login, socialLoginSuccess } = useAuth();
+  const { login, socialLogin } = useAuth();
   const { showNotification } = useNotification();
   const navigate = useNavigate();
 
@@ -59,33 +60,30 @@ export default function Login() {
     }
   }, [showNotification]);
 
-  const handleSocialLogin = (platform) => {
-    const width = 600;
-    const height = 700;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
-
-    const popup = window.open(
-      `/social-auth-popup?platform=${platform}&isRegister=false`,
-      'Authorize CreatorHub',
-      `width=${width},height=${height},left=${left},top=${top}`
-    );
-
-    const handleMessage = (event) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type === 'social-auth-success') {
-        const { data } = event.data;
-        if (data.success) {
-          socialLoginSuccess(data);
-          showNotification(`Successfully signed in with ${platform.charAt(0).toUpperCase() + platform.slice(1)}!`, 'success');
-          navigate('/');
-        } else {
-          showNotification(data.message || 'Social authentication failed', 'error');
-        }
-        window.removeEventListener('message', handleMessage);
+  const handleSocialLogin = async (platform) => {
+    setLoading(true);
+    try {
+      let credential;
+      if (platform === 'youtube') {
+        credential = await firebaseSignInWithGoogle();
+      } else {
+        credential = await firebaseSignInWithFacebook();
       }
-    };
-    window.addEventListener('message', handleMessage);
+      const idToken = await getIdToken(credential.user);
+      
+      const data = await socialLogin(platform, idToken);
+      if (data.success) {
+        showNotification(`Successfully signed in with ${platform.charAt(0).toUpperCase() + platform.slice(1)}!`, 'success');
+        navigate('/');
+      } else {
+        showNotification(data.message || 'Social authentication failed', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification('Social authentication was cancelled or failed.', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -7,13 +7,12 @@ import {
   signInWithRedirect,
   getRedirectResult,
   GoogleAuthProvider,
+  FacebookAuthProvider,
   sendEmailVerification,
   sendPasswordResetEmail,
   signOut
 } from 'firebase/auth';
 
-// Firebase config fetched from backend so keys stay server-side
-// Falls back to env vars if available, otherwise fetches from server
 const firebaseConfig = {
   apiKey: "AIzaSyC_sS7B4sUof50LbM0aoBy1DWBpSYWp7qg",
   authDomain: "doceditor-4c664.firebaseapp.com",
@@ -23,13 +22,17 @@ const firebaseConfig = {
   appId: "1:893235858399:web:41280f0f056b78282f926a"
 };
 
-// Initialize immediately (synchronous)
+// Initialize immediately
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-export { auth, googleProvider, getRedirectResult };
+const facebookProvider = new FacebookAuthProvider();
+facebookProvider.setCustomParameters({ display: 'popup' });
+
+export { auth, googleProvider, facebookProvider, getRedirectResult };
 
 export const initFirebase = () => Promise.resolve(auth);
 
@@ -49,6 +52,9 @@ export const firebaseSignInWithGoogle = () =>
 
 export const firebaseSignInWithGoogleRedirect = () =>
   signInWithRedirect(auth, googleProvider);
+
+export const firebaseSignInWithFacebook = () =>
+  signInWithPopup(auth, facebookProvider);
 
 export const firebasePasswordReset = (email) =>
   sendPasswordResetEmail(auth, email);

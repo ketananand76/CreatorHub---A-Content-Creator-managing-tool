@@ -7,6 +7,25 @@ const JWT_SECRET = process.env.JWT_SECRET || 'creatorhub-super-secret-key-123';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'creatorhub-refresh-secret-key-456';
 const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyC_sS7B4sUof50LbM0aoBy1DWBpSYWp7qg';
 
+const verifyFirebaseToken = async (idToken) => {
+  const apiKey = FIREBASE_API_KEY;
+  if (!apiKey) {
+    throw new Error('Firebase API Key is not configured on the server.');
+  }
+
+  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken })
+  });
+
+  const data = await response.json();
+  if (data.error) {
+    throw new Error(data.error.message || 'Firebase token verification failed.');
+  }
+  return data.users[0];
+};
+
 const generateTokens = (user) => {
   const accessToken = jwt.sign(
     { id: user._id || user.id, email: user.email, role: user.role },
@@ -495,20 +514,46 @@ export const login = async (req, res) => {
 
 export const socialLogin = async (req, res) => {
   try {
-    const { platform, email, name, socialId, profilePicture } = req.body;
+    const { platform, idToken } = req.body;
 
-    if (!platform || !socialId || !name) {
-      return res.status(400).json({ success: false, message: 'Platform, social ID, and name are required' });
+    if (!platform || !idToken) {
+      return res.status(400).json({ success: false, message: 'Platform and authentication token are required' });
     }
 
-    const targetEmail = email ? email.toLowerCase() : `${platform}_${socialId}@creatorhub.mock`;
+    // Securely verify Firebase idToken
+    let decodedToken;
+    try {
+      decodedToken = await verifyFirebaseToken(idToken);
+    } catch (tokenErr) {
+      console.error('Firebase token verification failed:', tokenErr);
+      return res.status(401).json({ success: false, message: 'Invalid or expired authentication credentials.' });
+    }
 
-    let user = await User.findOne({ email: targetEmail });
-    
-    // Also search by name if email is generated/mock
-    if (!user && targetEmail.endsWith('@creatorhub.mock')) {
-      const allUsers = await User.find({ role: 'Creator' });
-      user = allUsers.find(u => u.name === name);
+    const email = decodedToken.email;
+    const name = decodedToken.displayName || decodedToken.name || email.split('@')[0];
+    const socialId = decodedToken.localId || decodedToken.uid || email.split('@')[0];
+    const profilePicture = decodedToken.photoUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${socialId}`;
+
+    // Extract Bearer token to see if linking an account to currently logged in user
+    let userId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        userId = decoded.id;
+      } catch (err) {
+        console.warn('Bearer token invalid during social account linking:', err.message);
+      }
+    }
+
+    let user;
+    if (userId) {
+      user = await User.findById(userId);
+    }
+
+    if (!user) {
+      user = await User.findOne({ email });
     }
 
     if (!user) {
@@ -518,10 +563,10 @@ export const socialLogin = async (req, res) => {
 
       user = await User.create({
         name,
-        email: targetEmail,
+        email,
         password: hashedPassword,
         role: 'Creator',
-        isVerified: true, // Social logins are verified immediately
+        isVerified: true,
         status: 'active'
       });
     }

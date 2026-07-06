@@ -249,12 +249,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const socialLogin = async (platform, email, name, socialId, profilePicture) => {
+  const socialLogin = async (platform, idToken) => {
     try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+
       const res = await fetch(`${API_BASE}/auth/social-login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform, email, name, socialId, profilePicture })
+        headers,
+        body: JSON.stringify({ platform, idToken })
       });
       const data = await res.json();
 

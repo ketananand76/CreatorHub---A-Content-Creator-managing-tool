@@ -4,6 +4,7 @@ import { useNotification } from '../context/NotificationContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { Globe, Youtube, Facebook, Instagram, RefreshCw, BarChart2, TrendingUp, Users, Heart, MessageCircle, Eye } from 'lucide-react';
+import { firebaseSignInWithGoogle, firebaseSignInWithFacebook, getIdToken } from '../firebase.js';
 
 export default function SocialTracker() {
   const { authFetch } = useAuth();
@@ -33,27 +34,32 @@ export default function SocialTracker() {
     fetchSocialAccounts();
   }, []);
 
-  const handleConnect = (platform) => {
-    const width = 600;
-    const height = 700;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
-
-    const popup = window.open(
-      `/social-auth-popup?platform=${platform}&isRegister=false`,
-      'Authorize CreatorHub',
-      `width=${width},height=${height},left=${left},top=${top}`
-    );
-
-    const handleMessage = (event) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type === 'social-auth-success') {
-        showNotification(`Successfully connected ${platform.toUpperCase()} profile!`, 'success');
-        fetchSocialAccounts();
-        window.removeEventListener('message', handleMessage);
+  const handleConnect = async (platform) => {
+    try {
+      let credential;
+      if (platform === 'youtube') {
+        credential = await firebaseSignInWithGoogle();
+      } else {
+        credential = await firebaseSignInWithFacebook();
       }
-    };
-    window.addEventListener('message', handleMessage);
+      const idToken = await getIdToken(credential.user);
+      
+      const res = await authFetch('/auth/social-login', {
+        method: 'POST',
+        body: JSON.stringify({ platform, idToken })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        showNotification(`Successfully connected ${platform.charAt(0).toUpperCase() + platform.slice(1)} profile!`, 'success');
+        fetchSocialAccounts();
+      } else {
+        showNotification(data.message || 'Failed to connect profile', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification('Social authorization was cancelled or failed.', 'error');
+    }
   };
 
   const handleSync = async (platform) => {
