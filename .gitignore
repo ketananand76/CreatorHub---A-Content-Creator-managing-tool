@@ -24,3 +24,8 @@ pnpm-debug.log*
 .idea/
 *.swp
 *.swo
+
+# Mock database files
+backend/data/
+frontend/.env.production
+frontend/.env

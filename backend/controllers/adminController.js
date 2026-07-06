@@ -1,4 +1,4 @@
-import { User, Transaction, SessionLog, Ticket, IncomeExpense, SystemSettings, BrandDeal, TeamTask, CalendarEvent } from '../models/db.js';
+import { User, Transaction, SessionLog, Ticket, IncomeExpense, SystemSettings, BrandDeal, TeamTask, CalendarEvent, Notification } from '../models/db.js';
 
 // --- USER-FACING ENDPOINTS ---
 
@@ -164,6 +164,75 @@ export const updateUserStatus = async (req, res) => {
   }
 };
 
+export const toggleUserPremium = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const nextPremium = !user.isPremium;
+    let premiumExpires = null;
+    if (nextPremium) {
+      const oneYear = new Date();
+      oneYear.setFullYear(oneYear.getFullYear() + 1);
+      premiumExpires = oneYear.toISOString();
+    }
+
+    await User.findByIdAndUpdate(userId, { isPremium: nextPremium, premiumExpires });
+
+    // Send notification to user about their tier status change
+    await Notification.create({
+      userId,
+      title: nextPremium ? 'Premium Activated 🌟' : 'Premium Deactivated ⚠️',
+      message: nextPremium 
+        ? `An administrator has manually activated your Premium subscription. Valid until ${new Date(premiumExpires).toLocaleDateString()}. Enjoy AI tools!`
+        : 'An administrator has manually deactivated your Premium subscription status.',
+      type: 'subscription'
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Premium status for ${user.name} has been ${nextPremium ? 'activated' : 'deactivated'}.`
+    });
+  } catch (error) {
+    console.error('Toggle Premium Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const updateUserRole = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    if (!['Creator', 'Team Member', 'Admin', 'Super Admin'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'Invalid role value' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    await User.findByIdAndUpdate(userId, { role });
+
+    // Send notification
+    await Notification.create({
+      userId,
+      title: 'Account Role Updated 👥',
+      message: `Your account role has been updated to ${role} by an administrator. Please log out and log back in to apply privileges.`,
+      type: 'system'
+    });
+
+    res.status(200).json({ success: true, message: `User role updated to ${role} successfully.` });
+  } catch (error) {
+    console.error('Update Role Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 export const deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -219,6 +288,14 @@ export const approveTransaction = async (req, res) => {
       premiumExpires: oneYear.toISOString()
     });
 
+    // Send notification to the paying user
+    await Notification.create({
+      userId: tx.userId,
+      title: 'Subscription Approved 🎉',
+      message: 'Congratulations! Your UPI payment has been verified. Premium features are now unlocked.',
+      type: 'subscription'
+    });
+
     // Automatically log this as income in the earnings tracker for admin stats, or for the platform!
     // Since payment goes to CreatorHub platform, Super Admin records total earnings.
     res.status(200).json({
@@ -245,6 +322,14 @@ export const rejectTransaction = async (req, res) => {
     }
 
     await Transaction.findByIdAndUpdate(transactionId, { status: 'rejected' });
+
+    // Send notification to user about payment rejection
+    await Notification.create({
+      userId: tx.userId,
+      title: 'Subscription Rejected ❌',
+      message: 'Your payment verification request was rejected. Please check the transaction details/UTR and submit again.',
+      type: 'subscription'
+    });
 
     res.status(200).json({
       success: true,

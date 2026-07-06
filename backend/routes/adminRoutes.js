@@ -7,6 +7,8 @@ import {
   getAdminStats,
   getUsersList,
   updateUserStatus,
+  toggleUserPremium,
+  updateUserRole,
   deleteUser,
   getPaymentLogs,
   approveTransaction,
@@ -38,6 +40,8 @@ router.get('/support/my-tickets', getMyTickets);
 router.get('/stats', authorize('Super Admin', 'Admin'), getAdminStats);
 router.get('/users', authorize('Super Admin', 'Admin'), getUsersList);
 router.put('/users/:userId/status', authorize('Super Admin', 'Admin'), updateUserStatus);
+router.put('/users/:userId/toggle-premium', authorize('Super Admin', 'Admin'), toggleUserPremium);
+router.put('/users/:userId/role', authorize('Super Admin', 'Admin'), updateUserRole);
 router.delete('/users/:userId', authorize('Super Admin', 'Admin'), deleteUser);
 router.get('/payment-logs', authorize('Super Admin', 'Admin'), getPaymentLogs);
 router.post('/payment-logs/:transactionId/approve', authorize('Super Admin', 'Admin'), approveTransaction);

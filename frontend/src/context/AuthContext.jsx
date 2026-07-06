@@ -11,12 +11,19 @@ import {
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const API_BASE = String(
+  const API_BASE_RAW = String(
     import.meta.env.VITE_API_BASE ||
     import.meta.env.VITE_API_TARGET ||
     import.meta.env.VITE_API_URL ||
     '/api'
-  ).replace(/\/$/, '');
+  );
+
+  // Backend mounts auth routes under /api/auth (see backend/server.js).
+  // If the env var points to the bare backend origin, prefix it with /api.
+  const API_BASE = (() => {
+    const base = API_BASE_RAW.replace(/\/$/, '');
+    return base.includes('/api') ? base : `${base}/api`;
+  })();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [accessToken, setAccessToken] = useState(null);
@@ -37,8 +44,11 @@ export const AuthProvider = ({ children }) => {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ token: storedRefreshToken })
             });
-            const data = await res.json();
-            if (data.success) {
+            const raw = await res.text();
+            let data;
+            try { data = JSON.parse(raw); } catch { data = null; }
+
+            if (data?.success) {
               setAccessToken(data.accessToken);
               localStorage.setItem('refreshToken', data.refreshToken);
             } else {
@@ -80,6 +90,13 @@ export const AuthProvider = ({ children }) => {
           }
         } catch (e) {
           console.error('Interval token refresh failed:', e);
+          // If refresh endpoint returns HTML/404, avoid breaking app state
+          try {
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+          } catch (_) {}
+          setUser(null);
+          setAccessToken(null);
         }
       }
     }, 10 * 60 * 1000);
@@ -88,6 +105,7 @@ export const AuthProvider = ({ children }) => {
   }, [user]);
 
   // Auth fetch wrapper incorporating headers
+  // Never throws — always returns a response-like object so callers can safely check res.ok
   const authFetch = async (endpoint, options = {}) => {
     let currentToken = accessToken;
     const headers = {
@@ -99,7 +117,15 @@ export const AuthProvider = ({ children }) => {
     }
 
     let url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
-    let res = await fetch(url, { ...options, headers });
+
+    let res;
+    try {
+      res = await fetch(url, { ...options, headers });
+    } catch {
+      // Network failure (ERR_CONNECTION_CLOSED, offline, CORS, etc.)
+      // Return a safe object so callers can do res.ok check without crashing
+      return { ok: false, status: 0, json: async () => ({ success: false, message: 'Network error: unable to reach server.' }) };
+    }
 
     if (res.status === 401 && localStorage.getItem('refreshToken')) {
       try {
@@ -121,7 +147,18 @@ export const AuthProvider = ({ children }) => {
         console.error('AuthFetch Refresh Failure:', err);
       }
     }
-    return res;
+
+    // Safely wrap res.json() so callers never crash on HTML error pages
+    const safeJson = async () => {
+      try {
+        const text = await res.text();
+        return JSON.parse(text);
+      } catch {
+        return { success: false, message: `Server error ${res.status}: endpoint not available.` };
+      }
+    };
+
+    return { ok: res.ok, status: res.status, json: safeJson };
   };
 
   // ─────────────────────────────────────────────
@@ -131,10 +168,22 @@ export const AuthProvider = ({ children }) => {
   // Login by sending credentials to the backend first; fall back to Firebase only if needed.
   const login = async (email, password, _twoFACode = '', isAdminLogin = false) => {
     try {
+      let payload = { isAdminLogin };
+
+      if (isAdminLogin) {
+        payload.email = email;
+        payload.password = password;
+      } else {
+        // Authenticate with Firebase first to verify user credentials
+        const credential = await firebaseSignInWithEmail(email, password);
+        const idToken = await getIdToken(credential.user);
+        payload.idToken = idToken;
+      }
+
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, isAdminLogin })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
 
@@ -150,7 +199,7 @@ export const AuthProvider = ({ children }) => {
       console.error('Login Error:', err);
       return {
         success: false,
-        message: 'Login failed. Please try again.'
+        message: translateFirebaseError(err.code) || err.message || 'Login failed. Please try again.'
       };
     }
   };
@@ -221,7 +270,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Google Sign In via Firebase Popup → backend records user
-  const googleOAuthLogin = async () => {
+  const googleOAuthLogin = async (isRegister = false) => {
     try {
       const credential = await firebaseSignInWithGoogle();
       const idToken = await getIdToken(credential.user);
@@ -229,7 +278,7 @@ export const AuthProvider = ({ children }) => {
       const res = await fetch(`${API_BASE}/auth/google-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken })
+        body: JSON.stringify({ idToken, isRegister })
       });
       const data = await res.json();
 

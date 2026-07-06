@@ -66,12 +66,13 @@ const AdminRoute = ({ children }) => {
 const AppLayout = () => {
   const { user } = useAuth();
   const currentRole = user?.role;
+  const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-dark-bg text-slate-800 dark:text-dark-text transition-colors duration-300">
-      <Sidebar />
+      <Sidebar mobileSidebarOpen={mobileSidebarOpen} setMobileSidebarOpen={setMobileSidebarOpen} />
       <div className="flex-1 flex flex-col min-w-0">
-        <TopHeader />
+        <TopHeader setMobileSidebarOpen={setMobileSidebarOpen} />
         <main className="flex-1 overflow-y-auto bg-slate-50/50 dark:bg-dark-bg/60">
           <Routes>
             <Route path="/" element={currentRole === 'Admin' || currentRole === 'Super Admin' ? <Navigate to="/admin" replace /> : <Dashboard />} />
@@ -100,7 +101,7 @@ const AppLayout = () => {
 
 export default function App() {
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ThemeProvider>
         <NotificationProvider>
           <AuthProvider>

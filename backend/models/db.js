@@ -132,6 +132,15 @@ const SystemSettingsSchema = new mongoose.Schema({
   value: { type: String, default: '' }
 }, { timestamps: true });
 
+const NotificationSchema = new mongoose.Schema({
+  userId: { type: String, required: true }, // 'all' for broadcasts, or user ID
+  title: { type: String, required: true },
+  message: { type: String, required: true },
+  type: { type: String, enum: ['broadcast', 'subscription', 'system'], default: 'system' },
+  isRead: { type: Boolean, default: false },
+  isReadBy: [{ type: String }] // Array of userIds who read it (for broadcasts)
+}, { timestamps: true });
+
 const MongoUser = useMongo ? mongoose.model('User', UserSchema) : null;
 const MongoCalendarEvent = useMongo ? mongoose.model('CalendarEvent', CalendarEventSchema) : null;
 const MongoBrandDeal = useMongo ? mongoose.model('BrandDeal', BrandDealSchema) : null;
@@ -142,6 +151,7 @@ const MongoSessionLog = useMongo ? mongoose.model('SessionLog', SessionLogSchema
 const MongoTicket = useMongo ? mongoose.model('Ticket', TicketSchema) : null;
 const MongoIncomeExpense = useMongo ? mongoose.model('IncomeExpense', IncomeExpenseSchema) : null;
 const MongoSystemSettings = useMongo ? mongoose.model('SystemSettings', SystemSettingsSchema) : null;
+const MongoNotification = useMongo ? mongoose.model('Notification', NotificationSchema) : null;
 
 // JSON Model Fallbacks
 const JsonUser = getJsonModel('User');
@@ -154,6 +164,7 @@ const JsonSessionLog = getJsonModel('SessionLog');
 const JsonTicket = getJsonModel('Ticket');
 const JsonIncomeExpense = getJsonModel('IncomeExpense');
 const JsonSystemSettings = getJsonModel('SystemSettings');
+const JsonNotification = getJsonModel('Notification');
 
 // Wrapper creator
 const createModelWrapper = (mongoModel, jsonModel) => {
@@ -213,4 +224,5 @@ export const SessionLog = createModelWrapper(MongoSessionLog, JsonSessionLog);
 export const Ticket = createModelWrapper(MongoTicket, JsonTicket);
 export const IncomeExpense = createModelWrapper(MongoIncomeExpense, JsonIncomeExpense);
 export const SystemSettings = createModelWrapper(MongoSystemSettings, JsonSystemSettings);
+export const Notification = createModelWrapper(MongoNotification, JsonNotification);
 export { useMongo };

@@ -15,7 +15,6 @@ import {
   LifeBuoy,
   MessageSquare,
   Lock,
-  Smartphone,
   Globe,
   Trophy,
   Brain
@@ -25,7 +24,7 @@ export default function SuperAdmin() {
   const { authFetch } = useAuth();
   const { showNotification } = useNotification();
 
-  const [activeTab, setActiveTab] = useState('overview'); // overview, users, payments, tickets, sessions
+  const [activeTab, setActiveTab] = useState('overview'); // overview, leaderboard, users, admins, broadcast, payments, tickets, sessions, adsense
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -53,6 +52,11 @@ export default function SuperAdmin() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [aiAnalysis, setAiAnalysis] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
+
+  // Broadcast notice state
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
 
   const fetchAdminData = async () => {
     try {
@@ -114,7 +118,38 @@ export default function SuperAdmin() {
         fetchAdminData();
       }
     } catch (e) {
-      showNotification('Banning failed', 'error');
+      showNotification('Status update failed', 'error');
+    }
+  };
+
+  const handleToggleUserPremium = async (userId) => {
+    try {
+      const res = await authFetch(`/admin/users/${userId}/toggle-premium`, {
+        method: 'PUT'
+      });
+      const data = await res.json();
+      if (data.success) {
+        showNotification(data.message, 'success');
+        fetchAdminData();
+      }
+    } catch (e) {
+      showNotification('Failed to toggle premium status', 'error');
+    }
+  };
+
+  const handleUpdateUserRole = async (userId, nextRole) => {
+    try {
+      const res = await authFetch(`/admin/users/${userId}/role`, {
+        method: 'PUT',
+        body: JSON.stringify({ role: nextRole })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showNotification(data.message, 'success');
+        fetchAdminData();
+      }
+    } catch (e) {
+      showNotification('Failed to update role', 'error');
     }
   };
 
@@ -225,17 +260,47 @@ export default function SuperAdmin() {
     }
   };
 
+  const handleSendBroadcast = async (e) => {
+    e.preventDefault();
+    if (!broadcastTitle.trim() || !broadcastMessage.trim()) return;
+    setSendingBroadcast(true);
+    try {
+      const res = await authFetch('/notifications/broadcast', {
+        method: 'POST',
+        body: JSON.stringify({ title: broadcastTitle, message: broadcastMessage })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showNotification('System broadcast notice published successfully!', 'success');
+        setBroadcastTitle('');
+        setBroadcastMessage('');
+      } else {
+        showNotification(data.message || 'Failed to send broadcast', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification('Server communication failure', 'error');
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
+
+  const creatorsAndTeam = users.filter(u => u.role !== 'Admin' && u.role !== 'Super Admin');
+  const adminUsers = users.filter(u => u.role === 'Admin' || u.role === 'Super Admin');
+
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8">
       {/* Tab Switcher */}
-      <div className="flex overflow-x-auto gap-4 border-b dark:border-slate-800 pb-3">
+      <div className="flex overflow-x-auto gap-4 border-b dark:border-slate-800 pb-3 scrollbar-hide">
         {[
           { id: 'overview', label: 'Analytics System', icon: Activity },
           { id: 'leaderboard', label: 'Creator Standings', icon: Trophy },
           { id: 'users', label: 'User Directory', icon: Users },
+          { id: 'admins', label: 'Admin Profiles', icon: Lock },
+          { id: 'broadcast', label: 'System Broadcasts', icon: MessageSquare },
           { id: 'payments', label: 'Payment Logs Queue', icon: DollarSign },
           { id: 'tickets', label: 'Support Queue', icon: LifeBuoy },
-          { id: 'sessions', label: 'Security & Device logs', icon: History },
+          { id: 'sessions', label: 'Security Logs', icon: History },
           { id: 'adsense', label: 'Google AdSense', icon: Globe }
         ].map(t => (
           <button
@@ -247,7 +312,7 @@ export default function SuperAdmin() {
                 : 'border-transparent text-slate-400 hover:text-slate-600'
             }`}
           >
-            <t.icon className="w-4 h-4" /> {t.label}
+            <t.icon className="w-4 h-4 text-slate-400" /> {t.label}
           </button>
         ))}
       </div>
@@ -264,10 +329,10 @@ export default function SuperAdmin() {
               {/* Analytics metrics */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
-                  { label: 'System Registered Users', value: stats.totalUsers, desc: `${stats.activeUsers} active sessions`, icon: Users, color: 'text-brand-500 bg-brand-500/10 border-brand-500/20' },
-                  { label: 'Pro Subscriptions', value: stats.premiumUsers, desc: 'Pro subscriptions active', icon: Award, color: 'text-amber-500 bg-amber-500/10 border-amber-500/20' },
-                  { label: 'Platform Revenue Earning', value: `₹${stats.totalRevenue.toLocaleString()}`, desc: 'Via approved UPI payments', icon: DollarSign, color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' },
-                  { label: 'Pending Payment Approvals', value: stats.pendingTransactions, desc: 'Awaiting review', icon: ShieldAlert, color: 'text-rose-500 bg-rose-500/10 border-rose-500/20' }
+                  { label: 'Registered Creators', value: creatorsAndTeam.length, desc: `${stats.activeUsers} active sessions`, icon: Users, color: 'text-brand-500 bg-brand-500/10 border-brand-500/20' },
+                  { label: 'Pro Subscriptions', value: stats.premiumUsers, desc: 'Premium workspace tiers', icon: Award, color: 'text-amber-500 bg-amber-500/10 border-amber-500/20' },
+                  { label: 'Platform Revenue', value: `₹${stats.totalRevenue.toLocaleString()}`, desc: 'Via verified UPI payments', icon: DollarSign, color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' },
+                  { label: 'Support Open Tickets', value: stats.openTickets, desc: 'Awaiting resolutions', icon: ShieldAlert, color: 'text-rose-500 bg-rose-500/10 border-rose-500/20' }
                 ].map((s, i) => (
                   <div key={i} className="glass p-6 rounded-2xl border flex items-center justify-between">
                     <div>
@@ -284,15 +349,15 @@ export default function SuperAdmin() {
 
               {/* Action alert box */}
               {stats.pendingTransactions > 0 && (
-                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400 flex items-center justify-between">
+                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <span className="font-bold flex items-center gap-1.5">
-                    <ShieldAlert className="w-4 h-4" /> You have {stats.pendingTransactions} pending subscription verification requests in queue.
+                    <ShieldAlert className="w-4 h-4 flex-shrink-0" /> You have {stats.pendingTransactions} pending subscription verification requests in queue.
                   </span>
                   <button
                     onClick={() => setActiveTab('payments')}
-                    className="px-3.5 py-1.5 bg-amber-500 text-slate-950 font-bold rounded-lg text-[10px] hover:bg-amber-600 transition-colors uppercase"
+                    className="px-3.5 py-1.5 bg-amber-500 text-slate-950 font-bold rounded-lg text-[10px] hover:bg-amber-600 transition-colors uppercase whitespace-nowrap"
                   >
-                    Open Logs
+                    Open Logs Queue
                   </button>
                 </div>
               )}
@@ -303,7 +368,7 @@ export default function SuperAdmin() {
           {activeTab === 'leaderboard' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Leaderboard Table */}
-              <div className="lg:col-span-2 glass p-6 rounded-2xl border space-y-6">
+              <div className="lg:col-span-2 glass p-6 rounded-2xl border space-y-6 overflow-hidden">
                 <div>
                   <h3 className="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2">
                     <Trophy className="w-5 h-5 text-yellow-500" />
@@ -315,7 +380,7 @@ export default function SuperAdmin() {
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full text-left border-collapse text-xs min-w-[600px]">
                     <thead>
                       <tr className="border-b dark:border-slate-800 text-slate-400 font-bold uppercase">
                         <th className="pb-3">Rank</th>
@@ -417,30 +482,64 @@ export default function SuperAdmin() {
 
           {/* --- TAB: USERS --- */}
           {activeTab === 'users' && (
-            <div className="glass p-6 rounded-2xl border overflow-hidden">
-              <h3 className="font-bold text-sm text-slate-800 dark:text-white mb-4">Manage System Accounts</h3>
+            <div className="glass p-6 rounded-2xl border space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b dark:border-slate-800">
+                <div>
+                  <h3 className="font-bold text-sm text-slate-800 dark:text-white">Creator Directory</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Manage and control standard creator and agency team accounts</p>
+                </div>
+                <div className="px-3 py-1 bg-brand-500/10 text-brand-600 dark:text-brand-400 text-xs font-bold rounded-lg border border-brand-500/20">
+                  {creatorsAndTeam.length} Active Accounts
+                </div>
+              </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
+                <table className="w-full text-left border-collapse text-xs min-w-[750px]">
                   <thead>
                     <tr className="border-b dark:border-slate-800 text-slate-400 font-bold uppercase">
                       <th className="pb-3">Name</th>
-                      <th className="pb-3">Email</th>
-                      <th className="pb-3">Role</th>
-                      <th className="pb-3">Pro Status</th>
-                      <th className="pb-3">Account Status</th>
+                      <th className="pb-3">Email Address</th>
+                      <th className="pb-3">Account Role</th>
+                      <th className="pb-3">Subscription</th>
+                      <th className="pb-3">Permissions Demote</th>
+                      <th className="pb-3">Status</th>
                       <th className="pb-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y dark:divide-slate-800">
-                    {users.map(u => (
+                    {creatorsAndTeam.map(u => (
                       <tr key={u.id} className="hover:bg-slate-100/30 dark:hover:bg-slate-800/20">
                         <td className="py-3 font-semibold dark:text-white">{u.name}</td>
-                        <td className="py-3 text-slate-400">{u.email}</td>
-                        <td className="py-3"><span className="px-2 py-0.5 rounded bg-brand-500/10 text-brand-600 font-bold uppercase text-[9px]">{u.role}</span></td>
+                        <td className="py-3 text-slate-400 font-mono">{u.email}</td>
                         <td className="py-3">
-                          <span className={`px-2 py-0.5 rounded font-bold uppercase text-[9px] ${u.isPremium ? 'bg-yellow-500/10 text-yellow-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
-                            {u.isPremium ? 'Active Pro' : 'Free User'}
+                          <span className="px-2.5 py-0.5 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 font-black uppercase text-[9px] border border-brand-500/20">
+                            {u.role}
                           </span>
+                        </td>
+                        <td className="py-3">
+                          <button
+                            onClick={() => handleToggleUserPremium(u.id)}
+                            className={`px-2.5 py-1 rounded-lg font-bold text-[10px] transition-all flex items-center gap-1 ${
+                              u.isPremium
+                                ? 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/25'
+                                : 'bg-slate-100 dark:bg-slate-800/50 text-slate-500 border border-slate-200 dark:border-slate-800 hover:bg-slate-200'
+                            }`}
+                            title="Toggle Premium Status"
+                          >
+                            <Award className="w-3.5 h-3.5" />
+                            {u.isPremium ? 'PRO (Active)' : 'FREE (Basic)'}
+                          </button>
+                        </td>
+                        <td className="py-3">
+                          <select
+                            value={u.role}
+                            onChange={(e) => handleUpdateUserRole(u.id, e.target.value)}
+                            className="px-2 py-1 bg-white dark:bg-slate-900 border dark:border-slate-800/80 rounded-lg text-slate-700 dark:text-slate-300 font-bold focus:outline-none focus:ring-1 focus:ring-brand-500 text-[10px]"
+                          >
+                            <option value="Creator">Creator</option>
+                            <option value="Team Member">Team Member</option>
+                            <option value="Admin">Admin</option>
+                            <option value="Super Admin">Super Admin</option>
+                          </select>
                         </td>
                         <td className="py-3">
                           <span className={`px-2 py-0.5 rounded font-bold uppercase text-[9px] ${
@@ -453,21 +552,21 @@ export default function SuperAdmin() {
                           {u.status === 'active' ? (
                             <button
                               onClick={() => handleUpdateUserStatus(u.id, 'suspended')}
-                              className="px-2.5 py-1 border border-amber-500/20 hover:bg-amber-500/10 text-amber-500 rounded-lg font-bold"
+                              className="px-2.5 py-1 border border-amber-500/25 hover:bg-amber-500/10 text-amber-500 rounded-lg font-bold text-[10px]"
                             >
                               Suspend
                             </button>
                           ) : (
                             <button
                               onClick={() => handleUpdateUserStatus(u.id, 'active')}
-                              className="px-2.5 py-1 border border-emerald-500/20 hover:bg-emerald-500/10 text-emerald-500 rounded-lg font-bold"
+                              className="px-2.5 py-1 border border-emerald-500/25 hover:bg-emerald-500/10 text-emerald-500 rounded-lg font-bold text-[10px]"
                             >
-                              Unban
+                              Activate
                             </button>
                           )}
                           <button
                             onClick={() => handleDeleteUser(u.id)}
-                            className="p-1 hover:bg-rose-500/10 text-rose-500 rounded-lg"
+                            className="p-1.5 hover:bg-rose-500/10 text-rose-500 rounded-lg inline-flex items-center"
                             title="Delete Permanently"
                           >
                             <UserX className="w-4 h-4" />
@@ -481,9 +580,148 @@ export default function SuperAdmin() {
             </div>
           )}
 
-          {/* --- TAB: PAYMENTS (UPI approvals) --- */}
+          {/* --- TAB: ADMINS --- */}
+          {activeTab === 'admins' && (
+            <div className="glass p-6 rounded-2xl border space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b dark:border-slate-800">
+                <div>
+                  <h3 className="font-bold text-sm text-slate-800 dark:text-white">Admin Command Profiles</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Control administrative access and roles</p>
+                </div>
+                <div className="px-3 py-1 bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-bold rounded-lg border border-red-500/20">
+                  {adminUsers.length} Administrators
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs min-w-[650px]">
+                  <thead>
+                    <tr className="border-b dark:border-slate-800 text-slate-400 font-bold uppercase">
+                      <th className="pb-3">Admin Name</th>
+                      <th className="pb-3">Email Address</th>
+                      <th className="pb-3">Security Role</th>
+                      <th className="pb-3">Status</th>
+                      <th className="pb-3">Permissions Change</th>
+                      <th className="pb-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y dark:divide-slate-800">
+                    {adminUsers.map(u => (
+                      <tr key={u.id} className="hover:bg-slate-100/30 dark:hover:bg-slate-800/20">
+                        <td className="py-3 font-semibold dark:text-white">{u.name}</td>
+                        <td className="py-3 text-slate-400 font-mono">{u.email}</td>
+                        <td className="py-3">
+                          <span className="px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 font-black uppercase text-[9px] border border-red-500/20">
+                            {u.role}
+                          </span>
+                        </td>
+                        <td className="py-3">
+                          <span className={`px-2 py-0.5 rounded font-bold uppercase text-[9px] ${
+                            u.status === 'active' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
+                          }`}>
+                            {u.status}
+                          </span>
+                        </td>
+                        <td className="py-3">
+                          <select
+                            value={u.role}
+                            onChange={(e) => handleUpdateUserRole(u.id, e.target.value)}
+                            className="px-2 py-1 bg-white dark:bg-slate-900 border dark:border-slate-800/80 rounded-lg text-slate-700 dark:text-slate-300 font-bold focus:outline-none focus:ring-1 focus:ring-brand-500 text-[10px]"
+                          >
+                            <option value="Super Admin">Super Admin</option>
+                            <option value="Admin">Admin</option>
+                            <option value="Creator">Creator</option>
+                            <option value="Team Member">Team Member</option>
+                          </select>
+                        </td>
+                        <td className="py-3 text-right space-x-2 whitespace-nowrap">
+                          {u.status === 'active' ? (
+                            <button
+                              onClick={() => handleUpdateUserStatus(u.id, 'suspended')}
+                              className="px-2.5 py-1 border border-amber-500/25 hover:bg-amber-500/10 text-amber-500 rounded-lg font-bold text-[10px]"
+                            >
+                              Suspend
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleUpdateUserStatus(u.id, 'active')}
+                              className="px-2.5 py-1 border border-emerald-500/25 hover:bg-emerald-500/10 text-emerald-500 rounded-lg font-bold text-[10px]"
+                            >
+                              Activate
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteUser(u.id)}
+                            className="p-1.5 hover:bg-rose-500/10 text-rose-500 rounded-lg inline-flex items-center"
+                            title="Delete Permanently"
+                          >
+                            <UserX className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* --- TAB: SYSTEM BROADCASTS --- */}
+          {activeTab === 'broadcast' && (
+            <div className="glass p-6 rounded-2xl border space-y-6">
+              <div className="border-b dark:border-slate-800 pb-3">
+                <h3 className="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-brand-500" />
+                  Publish System Notice Broadcast
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Send system-wide broadcast notification alerts instantly to all registered creators and team members on the platform.
+                </p>
+              </div>
+
+              <form onSubmit={handleSendBroadcast} className="space-y-4 max-w-xl">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
+                    Notice Title
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={broadcastTitle}
+                    onChange={(e) => setBroadcastTitle(e.target.value)}
+                    placeholder="e.g. Scheduled Maintenance, System Upgrade, Platform News..."
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-slate-800 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
+                    Notice Message
+                  </label>
+                  <textarea
+                    rows={5}
+                    required
+                    value={broadcastMessage}
+                    onChange={(e) => setBroadcastMessage(e.target.value)}
+                    placeholder="Write detailed announcements, update release descriptions, or notices..."
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-slate-800 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={sendingBroadcast}
+                  className="px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <MessageSquare className="w-4 h-4 text-white" />
+                  {sendingBroadcast ? 'Publishing...' : 'Publish System Notice'}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* --- TAB: PAYMENTS --- */}
           {activeTab === 'payments' && (
-            <div className="glass p-6 rounded-2xl border">
+            <div className="glass p-6 rounded-2xl border space-y-4">
               <h3 className="font-bold text-sm text-slate-800 dark:text-white mb-4">UPI Subscription Review Logs</h3>
               {payments.length === 0 ? (
                 <div className="text-center py-10 text-xs text-slate-400">
@@ -491,7 +729,7 @@ export default function SuperAdmin() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full text-left border-collapse text-xs min-w-[700px]">
                     <thead>
                       <tr className="border-b dark:border-slate-800 text-slate-400 font-bold uppercase">
                         <th className="pb-3">User</th>
@@ -526,13 +764,13 @@ export default function SuperAdmin() {
                               <div className="flex justify-end gap-2">
                                 <button
                                   onClick={() => handleApprovePayment(p._id || p.id)}
-                                  className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500 text-slate-950 rounded-lg font-bold"
+                                  className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500 text-slate-950 rounded-lg font-bold text-[10px]"
                                 >
                                   <Check className="w-3.5 h-3.5" /> Approve
                                 </button>
                                 <button
                                   onClick={() => handleRejectPayment(p._id || p.id)}
-                                  className="flex items-center gap-1 px-2.5 py-1 bg-rose-500 text-white rounded-lg font-bold"
+                                  className="flex items-center gap-1 px-2.5 py-1 bg-rose-500 text-white rounded-lg font-bold text-[10px]"
                                 >
                                   <X className="w-3.5 h-3.5" /> Reject
                                 </button>
@@ -552,7 +790,7 @@ export default function SuperAdmin() {
 
           {/* --- TAB: TICKETS --- */}
           {activeTab === 'tickets' && (
-            <div className="glass p-6 rounded-2xl border">
+            <div className="glass p-6 rounded-2xl border space-y-4">
               <h3 className="font-bold text-sm text-slate-800 dark:text-white mb-4">Support Ticket Backlog</h3>
               {tickets.length === 0 ? (
                 <div className="text-center py-10 text-xs text-slate-400">
@@ -562,19 +800,19 @@ export default function SuperAdmin() {
                 <div className="space-y-4">
                   {tickets.map(t => (
                     <div key={t._id || t.id} className="p-4 rounded-xl border dark:border-slate-800/80 bg-white/20 dark:bg-slate-900/20 flex flex-col sm:flex-row justify-between gap-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-3">
+                      <div className="space-y-2 min-w-0 flex-1">
+                        <div className="flex items-center gap-3 flex-wrap">
                           <span className="text-[10px] font-bold text-slate-400">{t.userEmail}</span>
                           <span className={`px-2 py-0.5 rounded font-bold uppercase text-[9px] ${t.status === 'resolved' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}>
                             {t.status}
                           </span>
                         </div>
-                        <h4 className="font-bold text-sm dark:text-white">{t.subject}</h4>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">{t.message}</p>
+                        <h4 className="font-bold text-sm dark:text-white truncate">{t.subject}</h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 break-words">{t.message}</p>
                         {t.reply && (
                           <div className="p-3 bg-brand-500/5 border dark:border-brand-500/10 rounded-lg text-xs">
                             <span className="font-bold text-brand-500 block mb-0.5">Admin Reply:</span>
-                            <span className="text-slate-600 dark:text-slate-300">{t.reply}</span>
+                            <span className="text-slate-600 dark:text-slate-300 break-words">{t.reply}</span>
                           </div>
                         )}
                       </div>
@@ -583,7 +821,7 @@ export default function SuperAdmin() {
                         {t.status === 'open' && (
                           <button
                             onClick={() => setReplyTicketId(t._id || t.id)}
-                            className="px-3.5 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-xs font-bold transition-all"
+                            className="px-3.5 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-xs font-bold transition-all w-full sm:w-auto"
                           >
                             Reply & Resolve
                           </button>
@@ -598,10 +836,10 @@ export default function SuperAdmin() {
 
           {/* --- TAB: SESSIONS --- */}
           {activeTab === 'sessions' && (
-            <div className="glass p-6 rounded-2xl border">
+            <div className="glass p-6 rounded-2xl border space-y-4">
               <h3 className="font-bold text-sm text-slate-800 dark:text-white mb-4">Login Security Logs</h3>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
+                <table className="w-full text-left border-collapse text-xs min-w-[650px]">
                   <thead>
                     <tr className="border-b dark:border-slate-800 text-slate-400 font-bold uppercase">
                       <th className="pb-3">User</th>
@@ -654,7 +892,7 @@ export default function SuperAdmin() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-4 bg-brand-500/5 border border-brand-500/10 rounded-xl">
+                <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between p-4 bg-brand-500/5 border border-brand-500/10 rounded-xl gap-4">
                   <div className="text-xs">
                     <span className="font-bold text-brand-500 block">Live Verification</span>
                     <span className="text-slate-400">Saving this setting will immediately push the ad block to all user interfaces.</span>
@@ -662,7 +900,7 @@ export default function SuperAdmin() {
                   <button
                     onClick={handleSaveAdsense}
                     disabled={savingAdCode}
-                    className="px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-colors disabled:opacity-50"
+                    className="px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-colors disabled:opacity-50 w-full md:w-auto"
                   >
                     {savingAdCode ? 'Saving Code...' : 'Save & Publish Ads'}
                   </button>
@@ -687,7 +925,7 @@ export default function SuperAdmin() {
                 onClick={() => setReplyTicketId(null)}
                 className="absolute top-4 right-4 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 text-slate-400" />
               </button>
 
               <h3 className="text-lg font-bold font-outfit text-slate-800 dark:text-white border-b dark:border-slate-800 pb-3 flex items-center gap-2">
@@ -697,7 +935,7 @@ export default function SuperAdmin() {
 
               <form onSubmit={handleReplyTicket} className="space-y-4">
                 <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Response message</label>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Response Message</label>
                   <textarea
                     required
                     placeholder="Provide answers or confirm subscription approval..."

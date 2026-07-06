@@ -299,9 +299,9 @@ export const login = async (req, res) => {
 
     let user = await User.findOne({ email });
 
-    const adminEmail = process.env.ADMIN_EMAIL?.trim() || 'ketanpaswan53@gmail.com';
+    const adminEmail = (process.env.ADMIN_EMAIL?.trim() || 'ketanpaswan53@gmail.com').toLowerCase();
     const adminPassword = process.env.ADMIN_PASSWORD?.trim() || 'Ketan@123';
-    const isDirectAdminLogin = providedEmail?.toLowerCase() === adminEmail && providedPassword === adminPassword;
+    const isDirectAdminLogin = email.toLowerCase() === adminEmail && providedPassword === adminPassword;
 
     if (isDirectAdminLogin) {
       if (!user) {
@@ -323,7 +323,7 @@ export const login = async (req, res) => {
 
     // Seed Ketan Paswan Admin on-the-fly if logging in for the first time via Firebase
     if (!user) {
-      if (email.toLowerCase() === (process.env.ADMIN_EMAIL?.trim() || 'ketanpaswan53@gmail.com')) {
+      if (email.toLowerCase() === adminEmail) {
         const randPassword = Math.random().toString(36).substring(2, 15);
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(randPassword, salt);
@@ -364,7 +364,13 @@ export const login = async (req, res) => {
       }
     }
 
-    if (isDirectAdminLogin) {
+    if (providedEmail && providedPassword) {
+      if (user.role !== 'Admin' && user.role !== 'Super Admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Access Denied: Direct credential login is restricted to administrator accounts.'
+        });
+      }
       const passwordMatch = await bcrypt.compare(providedPassword, user.password);
       if (!passwordMatch) {
         return res.status(401).json({ success: false, message: 'Incorrect password.' });
@@ -435,7 +441,7 @@ export const login = async (req, res) => {
 
 export const googleLogin = async (req, res) => {
   try {
-    const { idToken } = req.body;
+    const { idToken, isRegister } = req.body;
 
     if (!idToken) {
       return res.status(400).json({ success: false, message: 'Google authentication failed: missing token' });
@@ -466,18 +472,26 @@ export const googleLogin = async (req, res) => {
 
     let user = await User.findOne({ email });
     if (!user) {
-      const randPassword = Math.random().toString(36).substring(2, 15);
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(randPassword, salt);
+      if (isRegister) {
+        const randPassword = Math.random().toString(36).substring(2, 15);
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(randPassword, salt);
 
-      user = await User.create({
-        name,
-        email,
-        password: hashedPassword,
-        isVerified: true, // Google accounts verified by default
-        role: 'Creator',
-        status: 'active'
-      });
+        user = await User.create({
+          name,
+          email,
+          password: hashedPassword,
+          isVerified: true, // Google accounts verified by default
+          role: 'Creator',
+          status: 'active'
+        });
+      } else {
+        return res.status(404).json({ success: false, message: 'User account not found. Please register first.' });
+      }
+    } else {
+      if (isRegister) {
+        return res.status(400).json({ success: false, message: 'An account with this email already exists. Please login instead.' });
+      }
     }
 
     if (user.status === 'suspended' || user.status === 'banned') {

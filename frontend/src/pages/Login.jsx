@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import Logo from '../components/Logo';
 import { Mail, Lock, Eye, EyeOff, Shield } from 'lucide-react';
 
@@ -15,6 +15,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showRegisterAlert, setShowRegisterAlert] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,6 +33,8 @@ export default function Login() {
         if (data.requiresVerification) {
           showNotification('Please verify your email first. Check your inbox!', 'warning');
           navigate('/verify-otp', { state: { email } });
+        } else if (data.message && (data.message.toLowerCase().includes('register first') || data.message.toLowerCase().includes('not found') || data.message.toLowerCase().includes('not exist'))) {
+          setShowRegisterAlert(true);
         } else {
           showNotification(data.message || 'Invalid email or password', 'error');
         }
@@ -47,12 +50,16 @@ export default function Login() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
-      const data = await googleOAuthLogin();
+      const data = await googleOAuthLogin(false);
       if (data.success) {
         showNotification('Google login successful!', 'success');
         navigate('/');
       } else {
-        showNotification(data.message || 'Google login failed', 'error');
+        if (data.message && (data.message.toLowerCase().includes('register first') || data.message.toLowerCase().includes('not found') || data.message.toLowerCase().includes('not exist'))) {
+          setShowRegisterAlert(true);
+        } else {
+          showNotification(data.message || 'Google login failed', 'error');
+        }
       }
     } catch (err) {
       showNotification('Google auth failed', 'error');
@@ -182,6 +189,47 @@ export default function Login() {
           </Link>
         </p>
       </motion.div>
+
+      {/* Custom Register Alert Modal */}
+      <AnimatePresence>
+        {showRegisterAlert && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-dark-card border dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-6 shadow-xl relative text-center"
+            >
+              <div className="mx-auto w-12 h-12 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-500">
+                <Mail className="w-5 h-5" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold font-outfit text-slate-800 dark:text-white">Account Not Registered</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  This email is not registered in our system. Only genuine creators can access the workspace. Please sign up to create a new workspace!
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowRegisterAlert(false)}
+                  className="flex-1 py-2.5 border dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl text-xs font-bold text-slate-500 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowRegisterAlert(false);
+                    navigate('/register');
+                  }}
+                  className="flex-1 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold transition-colors"
+                >
+                  Register Now
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

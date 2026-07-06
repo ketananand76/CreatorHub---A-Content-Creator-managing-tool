@@ -14,14 +14,14 @@ export default function Logo({ size = 32, showText = false, textClassName = "tex
       >
         <defs>
           <linearGradient id="logoBrandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#8b5cf6" />
-            <stop offset="50%" stop-color="#7c3aed" />
-            <stop offset="100%" stop-color="#06b6d4" />
+            <stop offset="0%" stopColor="#8b5cf6" />
+            <stop offset="50%" stopColor="#7c3aed" />
+            <stop offset="100%" stopColor="#06b6d4" />
           </linearGradient>
           
           <linearGradient id="logoAccentGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#ec4899" />
-            <stop offset="100%" stop-color="#8b5cf6" />
+            <stop offset="0%" stopColor="#ec4899" />
+            <stop offset="100%" stopColor="#8b5cf6" />
           </linearGradient>
 
           <filter id="logoGlow" x="-20%" y="-20%" width="140%" height="140%">
@@ -34,9 +34,9 @@ export default function Logo({ size = 32, showText = false, textClassName = "tex
           d="M 390 140 A 170 170 0 1 0 390 372" 
           fill="none" 
           stroke="url(#logoBrandGrad)" 
-          stroke-width="42" 
-          stroke-linecap="round" 
-          stroke-linejoin="round"
+          strokeWidth="42" 
+          strokeLinecap="round" 
+          strokeLinejoin="round"
         />
 
         <path 

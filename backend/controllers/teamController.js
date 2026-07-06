@@ -88,8 +88,13 @@ export const updateTaskStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Task not found' });
     }
 
-    // Auth check: Must be the creator who assigned it or the team member it is assigned to
-    if (task.assignedTo !== userId && task.creatorId !== userId && req.user.role !== 'Super Admin') {
+    // Authorization: Team Member can update status if assigned to them.
+    // Creator can update status if they created/assigned it.
+    // Super Admin can update anything.
+    const isAssignedToMe = String(task.assignedTo) === String(userId);
+    const isCreatedByMe = String(task.creatorId) === String(userId);
+
+    if (!isAssignedToMe && !isCreatedByMe && req.user.role !== 'Super Admin' && req.user.role !== 'Admin') {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
@@ -111,7 +116,7 @@ export const deleteTask = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Task not found' });
     }
 
-    if (task.creatorId !== userId && req.user.role !== 'Super Admin') {
+    if (String(task.creatorId) !== String(userId) && req.user.role !== 'Super Admin') {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 

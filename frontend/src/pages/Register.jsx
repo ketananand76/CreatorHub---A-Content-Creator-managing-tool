@@ -48,7 +48,7 @@ export default function Register() {
   const handleGoogleRegister = async () => {
     setLoading(true);
     try {
-      const data = await googleOAuthLogin();
+      const data = await googleOAuthLogin(true);
       if (data.success) {
         showNotification('Registered & logged in with Google!', 'success');
         navigate('/');
