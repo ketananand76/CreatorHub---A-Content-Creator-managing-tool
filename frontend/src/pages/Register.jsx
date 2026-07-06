@@ -100,17 +100,10 @@ export default function Register() {
       }
     } catch (err) {
       console.error('Social Register Error:', err);
-      if (err.code === 'auth/operation-not-allowed') {
-        setBypassPlatform(platform);
-        setShowBypassModal(true);
-      } else {
-        const friendlyMessage = err.code === 'auth/popup-blocked'
-          ? 'Sign-in popup was blocked by your browser. Please allow popups for this site.'
-          : err.code === 'auth/popup-closed-by-user'
-          ? 'Sign-in popup was closed before completion.'
-          : err.message || 'Social registration failed.';
-        showNotification(friendlyMessage, 'error');
-      }
+      // For any Firebase auth error (blocked popup, operation not allowed, etc.), open the Workspace Security Key fallback modal!
+      setBypassPlatform(platform);
+      setShowBypassModal(true);
+      showNotification('Opening Secure Workspace Key authentication...', 'info');
     } finally {
       setLoading(false);
     }
