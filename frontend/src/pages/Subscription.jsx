@@ -594,7 +594,7 @@ export default function Subscription() {
                   <span className="text-[10px] uppercase font-bold text-slate-400">Scan to Pay ₹999</span>
                   <div className="w-32 h-32 bg-white flex items-center justify-center mx-auto my-3 rounded-lg p-1">
                     <img 
-                      src={`https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent('upi://pay?pa=9771735011@mbk&pn=CreatorHub&am=999&cu=INR')}`} 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent('upi://pay?pa=9771735011@mbk&pn=CreatorHub&am=999&cu=INR')}`} 
                       alt="UPI QR Code"
                       className="w-full h-full"
                     />
