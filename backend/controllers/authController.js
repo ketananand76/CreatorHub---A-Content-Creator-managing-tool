@@ -215,7 +215,7 @@ export const register = async (req, res) => {
     const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}`;
     
     // Send email without blocking the response
-    await sendLinkEmail(email.toLowerCase(), verificationLink, 'verification');
+    sendLinkEmail(email.toLowerCase(), verificationLink, 'verification').catch(console.error);
 
     res.status(201).json({
       success: true,
