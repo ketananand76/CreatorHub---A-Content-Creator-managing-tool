@@ -7,7 +7,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import session from 'express-session';
 import passport from './config/passport.js';
-import connectDB from './models/db.js';
 import { initFirebaseAdmin } from './utils/firebaseAdmin.js';
 
 import authRoutes from './routes/authRoutes.js';
@@ -55,7 +54,6 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Connect to database and Firebase
-connectDB();
 initFirebaseAdmin();
 
 // Rate Limiter
