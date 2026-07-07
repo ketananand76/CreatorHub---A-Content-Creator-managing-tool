@@ -150,21 +150,30 @@ const sendLinkEmail = async (email, link, type = 'verification') => {
   await sendRealEmail(email, isReset ? 'CreatorHub: Reset Your Password' : 'CreatorHub: Verify Your Email', brandTemplate);
 };
 
+// Global transporter instance for faster emails
+let globalTransporter = null;
+const initTransporter = () => {
+  if (globalTransporter) return globalTransporter;
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return null;
+  const isGmail = (process.env.SMTP_HOST || '').toLowerCase().includes('gmail');
+  globalTransporter = nodemailer.createTransport(
+    isGmail 
+      ? { service: 'gmail', auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } }
+      : {
+          host: process.env.SMTP_HOST || 'smtp.gmail.com',
+          port: Number(process.env.SMTP_PORT) || 465,
+          secure: Number(process.env.SMTP_PORT) === 465,
+          auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+        }
+  );
+  return globalTransporter;
+};
+
 // Helper to actually send the email via nodemailer if configured
 const sendRealEmail = async (to, subject, html) => {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+  const transporter = initTransporter();
+  if (!transporter) return;
   try {
-    const isGmail = (process.env.SMTP_HOST || '').toLowerCase().includes('gmail');
-    const transporter = nodemailer.createTransport(
-      isGmail 
-        ? { service: 'gmail', auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } }
-        : {
-            host: process.env.SMTP_HOST || 'smtp.gmail.com',
-            port: Number(process.env.SMTP_PORT) || 465,
-            secure: Number(process.env.SMTP_PORT) === 465,
-            auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-          }
-    );
     const senderName = process.env.MAIL_FROM_NAME || 'CreatorHub Team';
     const senderAddress = process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER;
     await transporter.sendMail({ from: `"${senderName}" <${senderAddress}>`, to, subject, html });
@@ -217,10 +226,11 @@ export const register = async (req, res) => {
       verificationToken
     });
 
-    const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
+    const frontendUrl = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:5173';
+    const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}`;
     
     // Send email without blocking the response
-    sendLinkEmail(email.toLowerCase(), verificationLink, 'verification').catch(console.error);
+    await sendLinkEmail(email.toLowerCase(), verificationLink, 'verification');
 
     res.status(201).json({
       success: true,
@@ -360,7 +370,8 @@ export const login = async (req, res) => {
         await User.findByIdAndUpdate(user._id || user.id, { verificationToken });
       }
       
-      const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
+      const frontendUrl = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:5173';
+      const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}`;
       sendLinkEmail(user.email, verificationLink, 'verification').catch(console.error);
 
       return res.status(200).json({
@@ -779,7 +790,7 @@ export const forgotPassword = async (req, res) => {
       resetPasswordExpires: resetPasswordExpires
     });
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:5173';
     const resetLink = `${frontendUrl}/reset-password?token=${token}`;
     
     sendLinkEmail(email, resetLink, 'reset').catch(console.error);
