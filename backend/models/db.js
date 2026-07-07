@@ -226,14 +226,21 @@ const JsonSocialAccount = getJsonModel('SocialAccount');
 
 // Wrapper creator
 const createModelWrapper = (mongoModel, jsonModel) => {
+  const mapQuery = (q) => {
+    if (!q || !q._id) return q;
+    const newQ = { ...q, id: q._id };
+    delete newQ._id;
+    return newQ;
+  };
+
   return {
     find: async (query) => {
       if (useMongo) return await mongoModel.find(query).lean();
-      return await jsonModel.find(query);
+      return await jsonModel.find(mapQuery(query));
     },
     findOne: async (query) => {
       if (useMongo) return await mongoModel.findOne(query).lean();
-      return await jsonModel.findOne(query);
+      return await jsonModel.findOne(mapQuery(query));
     },
     findById: async (id) => {
       if (useMongo) return await mongoModel.findById(id).lean();
@@ -251,7 +258,7 @@ const createModelWrapper = (mongoModel, jsonModel) => {
         const result = await mongoModel.findOneAndUpdate(query, update, { new: true, ...options });
         return result ? result.toObject() : null;
       }
-      return await jsonModel.findOneAndUpdate(query, update, options);
+      return await jsonModel.findOneAndUpdate(mapQuery(query), update, options);
     },
     findByIdAndUpdate: async (id, update, options) => {
       if (useMongo) return await mongoModel.findByIdAndUpdate(id, update, { new: true, ...options }).lean();
@@ -259,15 +266,15 @@ const createModelWrapper = (mongoModel, jsonModel) => {
     },
     updateOne: async (query, update) => {
       if (useMongo) return await mongoModel.updateOne(query, update);
-      return await jsonModel.updateOne(query, update);
+      return await jsonModel.updateOne(mapQuery(query), update);
     },
     deleteOne: async (query) => {
       if (useMongo) return await mongoModel.deleteOne(query);
-      return await jsonModel.deleteOne(query);
+      return await jsonModel.deleteOne(mapQuery(query));
     },
     deleteMany: async (query) => {
       if (useMongo) return await mongoModel.deleteMany(query);
-      return await jsonModel.deleteMany(query);
+      return await jsonModel.deleteMany(mapQuery(query));
     }
   };
 };
