@@ -194,9 +194,6 @@ export const register = async (req, res) => {
       if (existingUser.isVerified) {
         return res.status(400).json({ success: false, message: 'User with this email already exists' });
       } else {
-        // If they exist but aren't verified, we could delete the old record.
-        // However, since we are moving to stateless registration, we just let them try again.
-        // But to be completely clean, let's just delete the old unverified junk record so we don't conflict later.
         await User.deleteOne({ _id: existingUser._id });
       }
     }
@@ -209,16 +206,21 @@ export const register = async (req, res) => {
       userRole = 'Team Member';
     }
 
-    // Create a temporary stateless JWT for registration details
-    const registrationToken = jwt.sign(
-      { name, email: email.toLowerCase(), hashedPassword, role: userRole },
-      JWT_SECRET,
-      { expiresIn: '15m' }
-    );
+    const verificationToken = Array.from({ length: 32 }, () => Math.random().toString(36)[2] || '0').join('');
+    
+    await User.create({
+      name,
+      email: email.toLowerCase(),
+      password: hashedPassword,
+      role: userRole,
+      isVerified: false,
+      verificationToken
+    });
 
-    // Send the verification link
-    const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${registrationToken}`;
-    await sendLinkEmail(email, verificationLink, 'verification');
+    const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
+    
+    // Send email without blocking the response
+    sendLinkEmail(email.toLowerCase(), verificationLink, 'verification').catch(console.error);
 
     res.status(201).json({
       success: true,
@@ -240,46 +242,41 @@ export const verifyEmail = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Verification token is required.' });
     }
 
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      
-      const existingUser = await User.findOne({ email: decoded.email });
-      if (existingUser) {
-         return res.status(400).json({ success: false, message: 'User already exists and is verified.' });
-      }
-
-      // Token is valid. Create the user in the database
-      const newUser = await User.create({
-        name: decoded.name,
-        email: decoded.email,
-        password: decoded.hashedPassword,
-        role: decoded.role,
-        isVerified: true,
-        status: 'active'
-      });
-
-      // Send Welcome Email asynchronously
-      sendWelcomeEmail(newUser.name, newUser.email).catch(console.error);
-
-      const { accessToken, refreshToken } = generateTokens(newUser);
-      return res.status(201).json({
-        success: true,
-        message: 'Account verified and created successfully!',
-        accessToken,
-        refreshToken,
-        user: {
-          id: newUser._id || newUser.id,
-          name: newUser.name,
-          email: newUser.email,
-          role: newUser.role,
-          isPremium: newUser.isPremium,
-          isTwoFAEnabled: newUser.isTwoFAEnabled
-        }
-      });
-
-    } catch (tokenErr) {
+    const user = await User.findOne({ verificationToken: token });
+    
+    if (!user) {
       return res.status(400).json({ success: false, message: 'Verification link expired or invalid. Please try registering again.' });
     }
+
+    if (user.isVerified) {
+      return res.status(400).json({ success: false, message: 'User already exists and is verified.' });
+    }
+
+    // Token is valid. Activate the user
+    user.isVerified = true;
+    user.status = 'active';
+    user.verificationToken = null;
+    await user.save();
+
+    // Send Welcome Email asynchronously
+    sendWelcomeEmail(user.name, user.email).catch(console.error);
+
+    const { accessToken, refreshToken } = generateTokens(user);
+    return res.status(201).json({
+      success: true,
+      message: 'Account verified successfully!',
+      accessToken,
+      refreshToken,
+      user: {
+        id: user._id || user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isPremium: user.isPremium,
+        isTwoFAEnabled: user.isTwoFAEnabled
+      }
+    });
+
   } catch (error) {
     console.error('Email Verification Error:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
@@ -357,13 +354,14 @@ export const login = async (req, res) => {
 
     if (!user.isVerified && !isDirectAdminLogin) {
       // User hasn't verified email yet, send a verification link
-      const registrationToken = jwt.sign(
-        { name: user.name, email: user.email, hashedPassword: user.password, role: user.role },
-        JWT_SECRET,
-        { expiresIn: '15m' }
-      );
-      const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${registrationToken}`;
-      await sendLinkEmail(user.email, verificationLink, 'verification');
+      let verificationToken = user.verificationToken;
+      if (!verificationToken) {
+        verificationToken = Array.from({ length: 32 }, () => Math.random().toString(36)[2] || '0').join('');
+        await User.findByIdAndUpdate(user._id || user.id, { verificationToken });
+      }
+      
+      const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
+      sendLinkEmail(user.email, verificationLink, 'verification').catch(console.error);
 
       return res.status(200).json({
         success: true,
@@ -784,7 +782,7 @@ export const forgotPassword = async (req, res) => {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const resetLink = `${frontendUrl}/reset-password?token=${token}`;
     
-    await sendLinkEmail(email, resetLink, 'reset');
+    sendLinkEmail(email, resetLink, 'reset').catch(console.error);
 
     res.status(200).json({
       success: true,
