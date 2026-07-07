@@ -120,7 +120,7 @@ export default function Referrals() {
           <div className="w-full h-4 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
             <div 
               className="h-full bg-gradient-to-r from-brand-500 to-rose-500 transition-all duration-1000 ease-out"
-              style={{ width: \`\${progressPercentage}%\` }}
+              style={{ width: `${progressPercentage}%` }}
             ></div>
           </div>
           
