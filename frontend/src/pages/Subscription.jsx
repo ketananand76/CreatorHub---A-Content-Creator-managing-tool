@@ -573,21 +573,18 @@ export default function Subscription() {
               </h3>
 
               <div className="space-y-4">
-                <div className="bg-brand-500/5 p-4 rounded-xl border dark:border-slate-800 space-y-2">
-                  <p className="text-xs text-slate-500">Please send exactly <span className="font-bold text-slate-800 dark:text-white">₹999</span> to this UPI ID:</p>
+                <div className="bg-brand-500/5 p-4 rounded-xl border dark:border-slate-800 space-y-3 text-center">
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                    Pay exactly <span className="font-black text-brand-600 dark:text-brand-400 text-lg">₹999</span> to activate Pro
+                  </p>
                   
-                  <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-2.5 rounded-xl border dark:border-slate-800">
-                    <code className="text-sm font-black text-brand-600 dark:text-brand-400 tracking-wider">
-                      9771735011@mbk
-                    </code>
-                    <button
-                      onClick={handleCopyUpi}
-                      className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-brand-500 transition-colors"
-                      title="Copy UPI ID"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  </div>
+                  <a
+                    href={`upi://pay?pa=9771735011@mbk&pn=CreatorHub&am=999&cu=INR`}
+                    className="flex items-center justify-center gap-2 w-full py-3 bg-[#673AB7] hover:bg-[#5E35B1] text-white rounded-xl font-bold transition-transform hover:-translate-y-0.5 shadow-lg shadow-[#673AB7]/20"
+                  >
+                    <Smartphone className="w-5 h-5" />
+                    Open UPI App to Pay
+                  </a>
                 </div>
 
                 <div className="text-center py-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-dashed dark:border-slate-800">
