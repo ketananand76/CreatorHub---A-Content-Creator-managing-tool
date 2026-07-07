@@ -579,7 +579,7 @@ export default function Subscription() {
                   </p>
                   
                   <a
-                    href={`upi://pay?pa=9771735011@mbk&pn=CreatorHub&am=999&cu=INR`}
+                    href={`upi://pay?pa=9771735011@mbk&pn=CreatorHub&am=999.00&cu=INR&tn=Pro%20Subscription`}
                     className="flex items-center justify-center gap-2 w-full py-3 bg-[#673AB7] hover:bg-[#5E35B1] text-white rounded-xl font-bold transition-transform hover:-translate-y-0.5 shadow-lg shadow-[#673AB7]/20"
                   >
                     <Smartphone className="w-5 h-5" />
@@ -591,7 +591,7 @@ export default function Subscription() {
                   <span className="text-[10px] uppercase font-bold text-slate-400">Scan to Pay ₹999</span>
                   <div className="w-32 h-32 bg-white flex items-center justify-center mx-auto my-3 rounded-lg p-1">
                     <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent('upi://pay?pa=9771735011@mbk&pn=CreatorHub&am=999&cu=INR')}`} 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent('upi://pay?pa=9771735011@mbk&pn=CreatorHub&am=999.00&cu=INR&tn=Pro Subscription')}`} 
                       alt="UPI QR Code"
                       className="w-full h-full"
                     />
