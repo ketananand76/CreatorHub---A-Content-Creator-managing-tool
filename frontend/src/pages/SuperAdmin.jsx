@@ -17,7 +17,12 @@ import {
   Lock,
   Globe,
   Trophy,
-  Brain
+  Brain,
+  FolderTree,
+  Edit3,
+  Save,
+  Power,
+  Ban
 } from 'lucide-react';
 
 export default function SuperAdmin() {
