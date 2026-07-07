@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { motion } from 'framer-motion';
 import AdSenseBanner from '../components/AdSenseBanner';
+import AdCarousel from '../components/AdCarousel';
 import {
   Sparkles,
   TrendingUp,
@@ -140,6 +141,11 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+      </motion.div>
+
+      {/* Ad Carousel */}
+      <motion.div variants={itemVariants}>
+        <AdCarousel />
       </motion.div>
 
       {/* Stats Grid */}
