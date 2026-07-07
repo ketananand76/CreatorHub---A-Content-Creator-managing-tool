@@ -167,118 +167,7 @@ const sendRealEmail = async (to, subject, html) => {
   }
 };
 
-export const register = async (req, res) => {
-  try {
-    const { name, email, password, role } = req.body;
-
-    if (!name || !email || !password) {
-      return res.status(400).json({ success: false, message: 'Name, email, and password are required.' });
-    }
-
-    const reservedAdminEmail = (process.env.ADMIN_EMAIL?.trim() || 'ketanpaswan53@gmail.com').toLowerCase();
-    if (email.toLowerCase() === reservedAdminEmail) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access Denied: This email address is reserved for system administration.'
-      });
-    }
-
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      if (existingUser.isVerified) {
-        return res.status(400).json({ success: false, message: 'User with this email already exists' });
-      } else {
-        await User.deleteOne({ _id: existingUser._id });
-      }
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    let userRole = 'Creator';
-    if (role === 'Team Member') {
-      userRole = 'Team Member';
-    }
-
-    const verificationToken = Array.from({ length: 32 }, () => Math.random().toString(36)[2] || '0').join('');
-    
-    await User.create({
-      name,
-      email: email.toLowerCase(),
-      password: hashedPassword,
-      role: userRole,
-      isVerified: false,
-      verificationToken
-    });
-
-    const frontendUrl = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:5173';
-    const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}`;
-    
-    // Send email without blocking the response
-    sendLinkEmail(email.toLowerCase(), verificationLink, 'verification').catch(console.error);
-
-    res.status(201).json({
-      success: true,
-      requiresVerification: true,
-      message: 'Registration initiated. A verification link has been sent to your email address.',
-      email: email.toLowerCase()
-    });
-  } catch (error) {
-    console.error('Registration Error:', error);
-    res.status(500).json({ success: false, message: error.message || 'Server error' });
-  }
-};
-
-export const verifyEmail = async (req, res) => {
-  try {
-    const { token } = req.body;
-    
-    if (!token) {
-      return res.status(400).json({ success: false, message: 'Verification token is required.' });
-    }
-
-    const user = await User.findOne({ verificationToken: token });
-    
-    if (!user) {
-      return res.status(400).json({ success: false, message: 'Verification link expired or invalid. Please try registering again.' });
-    }
-
-    if (user.isVerified) {
-      return res.status(400).json({ success: false, message: 'User already exists and is verified.' });
-    }
-
-    // Token is valid. Activate the user
-    user.isVerified = true;
-    user.status = 'active';
-    user.verificationToken = null;
-    await user.save();
-
-    // Send Welcome Email asynchronously
-    sendWelcomeEmail(user.name, user.email).catch(console.error);
-
-    const { accessToken, refreshToken } = generateTokens(user);
-    return res.status(201).json({
-      success: true,
-      message: 'Account verified successfully!',
-      accessToken,
-      refreshToken,
-      user: {
-        id: user._id || user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isPremium: user.isPremium,
-        isTwoFAEnabled: user.isTwoFAEnabled
-      }
-    });
-
-  } catch (error) {
-    console.error('Email Verification Error:', error);
-    res.status(500).json({ success: false, message: error.message || 'Server error' });
-  }
-};
-
-export const login = async (req, res) => {
+export const adminLogin = async (req, res) => {
   try {
     const { identifier, password: providedPassword, isAdminLogin } = req.body;
 
@@ -395,6 +284,74 @@ export const login = async (req, res) => {
 };
 
 // verifyLogin completely removed as it's for Firebase
+
+
+export const firebaseSync = async (req, res) => {
+  try {
+    const { idToken, name, role } = req.body;
+    if (!idToken) return res.status(400).json({ success: false, message: 'Firebase ID Token is required.' });
+
+    let decodedToken;
+    try {
+      decodedToken = await verifyFirebaseToken(idToken);
+    } catch (err) {
+      console.error('Firebase token verification failed:', err);
+      return res.status(401).json({ success: false, message: 'Invalid or expired Firebase token.' });
+    }
+
+    if (!decodedToken.email_verified) {
+      return res.status(403).json({ success: false, message: 'Email not verified. Please verify your email first.' });
+    }
+
+    const email = decodedToken.email.toLowerCase();
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // Create user if they don't exist
+      user = await User.create({
+        name: name || decodedToken.name || email.split('@')[0],
+        email,
+        role: role || 'Creator',
+        isVerified: true
+      });
+    } else if (!user.isVerified) {
+      // Mark as verified if they weren't
+      user.isVerified = true;
+      await user.save();
+    }
+
+    // Generate our JWT
+    const { accessToken, refreshToken } = generateTokens(user._id || user.id);
+    user.refreshToken = refreshToken;
+    await user.save();
+
+    await SessionLog.create({
+      userId: user._id || user.id,
+      email: user.email,
+      ipAddress: req.ip,
+      device: req.headers['user-agent'] || 'Unknown',
+      location: 'Unknown',
+      status: 'success'
+    });
+
+    res.status(200).json({
+      success: true,
+      accessToken,
+      refreshToken,
+      user: {
+        id: user._id || user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isPremium: user.isPremium
+      }
+    });
+
+  } catch (error) {
+    console.error('Firebase Sync Error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
 
 export const socialLogin = async (req, res) => {
   try {
@@ -749,148 +706,6 @@ export const disable2FA = async (req, res) => {
   } catch (error) {
     console.error('Disable 2FA Error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
-
-export const forgotPassword = async (req, res) => {
-  try {
-    const { email } = req.body;
-    
-    // Block Admin Email from Password Reset
-    const adminEmail = (process.env.ADMIN_EMAIL?.trim() || 'ketanpaswan53@gmail.com').toLowerCase();
-    if (email.toLowerCase() === adminEmail) {
-      return res.status(403).json({ success: false, message: 'Password reset is disabled for the administrator account. Please contact support.' });
-    }
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found with this email' });
-    }
-
-    const token = Array.from({ length: 32 }, () => Math.random().toString(36)[2] || '0').join('');
-    const resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-    await User.findByIdAndUpdate(user._id || user.id, {
-      resetPasswordToken: token,
-      resetPasswordExpires: resetPasswordExpires
-    });
-
-    const frontendUrl = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:5173';
-    const resetLink = `${frontendUrl}/reset-password?token=${token}`;
-    
-    sendLinkEmail(email, resetLink, 'reset').catch(console.error);
-
-    res.status(200).json({
-      success: true,
-      message: 'Reset link sent to email',
-      simulatedLink: resetLink
-    });
-  } catch (error) {
-    console.error('Forgot Password Error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
-
-export const resetPassword = async (req, res) => {
-  try {
-    const { token, newPassword } = req.body;
-
-    if (!token || !newPassword) {
-      return res.status(400).json({ success: false, message: 'Token and new password are required' });
-    }
-
-    const user = await User.findOne({
-      resetPasswordToken: token,
-      resetPasswordExpires: { $gt: new Date() }
-    });
-
-    if (!user) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired password reset link.' });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-    await User.findByIdAndUpdate(user._id || user.id, {
-      password: hashedPassword,
-      resetPasswordToken: null,
-      resetPasswordExpires: null
-    });
-
-    res.status(200).json({ success: true, message: 'Password has been reset successfully!' });
-  } catch (error) {
-    console.error('Reset Password Error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
-
-export const resendOTP = async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ success: false, message: 'Email address is required' });
-    }
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'No registered user found with this email' });
-    }
-
-    const verificationToken = Array.from({ length: 32 }, () => Math.random().toString(36)[2] || '0').join('');
-    await User.findByIdAndUpdate(user._id || user.id, { verificationToken });
-
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;
-    
-    await sendLinkEmail(email, verificationLink, 'verification');
-
-    res.status(200).json({
-      success: true,
-      message: 'A new verification link has been sent successfully.',
-      simulatedLink: verificationLink
-    });
-  } catch (error) {
-    console.error('Resend Link Error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
-
-export const verifyEmailLink = async (req, res) => {
-  try {
-    const { token } = req.body;
-    if (!token) {
-      return res.status(400).json({ success: false, message: 'Verification token is required.' });
-    }
-
-    const user = await User.findOne({ verificationToken: token });
-    if (!user) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired verification link.' });
-    }
-
-    await User.findByIdAndUpdate(user._id || user.id, {
-      isVerified: true,
-      verificationToken: null
-    });
-
-    const { accessToken, refreshToken } = generateTokens(user);
-
-    res.status(200).json({
-      success: true,
-      message: 'Account verified successfully!',
-      accessToken,
-      refreshToken,
-      user: {
-        id: user._id || user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isPremium: user.isPremium,
-        isTwoFAEnabled: user.isTwoFAEnabled
-      }
-    });
-  } catch (error) {
-    console.error('Verify Email Link Error:', error);
-    res.status(500).json({ success: false, message: 'Server error during email verification.' });
   }
 };
 

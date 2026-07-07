@@ -126,7 +126,7 @@ export default function Login() {
             </div>
             <h3 className="text-2xl font-black font-outfit text-slate-800 dark:text-white">Verification Required</h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
-              Your account hasn't been verified yet. We just sent a new verification link to <strong className="text-slate-700 dark:text-slate-300">{formData.email.toLowerCase()}</strong>.
+              Your account hasn't been verified yet. Please check your inbox for the verification link sent to <strong className="text-slate-700 dark:text-slate-300">{formData.email.toLowerCase()}</strong>.
             </p>
             <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
               <button

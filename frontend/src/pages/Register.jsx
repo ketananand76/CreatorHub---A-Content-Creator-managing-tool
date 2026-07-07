@@ -7,7 +7,7 @@ import Logo from '../components/Logo';
 import { Mail, Lock, User, UserCheck, Shield, Eye, EyeOff } from 'lucide-react';
 
 export default function Register() {
-  const { register, verifyOTP } = useAuth();
+  const { register } = useAuth();
   const { showNotification } = useNotification();
   const navigate = useNavigate();
 

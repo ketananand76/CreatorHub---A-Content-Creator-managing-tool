@@ -190,124 +190,87 @@ export const AuthProvider = ({ children }) => {
   // ─────────────────────────────────────────────
 
   const login = async (identifier, password, isAdminLogin = false) => {
+    if (isAdminLogin) {
+      try {
+        const res = await fetch(`${API_BASE}/auth/admin-login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier, password, isAdminLogin })
+        });
+        const data = await res.json();
+        if (data.success) {
+          setUser(data.user);
+          setAccessToken(data.accessToken);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          localStorage.setItem('refreshToken', data.refreshToken);
+        }
+        return data;
+      } catch (err) {
+        return { success: false, message: 'Admin login failed.' };
+      }
+    }
+
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
+      const credential = await firebaseSignInWithEmail(identifier, password);
+      if (!credential.user.emailVerified) {
+        return { success: false, requiresVerification: true, message: 'Email not verified. Please check your inbox for the verification link.' };
+      }
+
+      const idToken = await getIdToken(credential.user);
+      const res = await fetch(`${API_BASE}/auth/firebase-sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier, password, isAdminLogin })
+        body: JSON.stringify({ idToken, name: credential.user.displayName })
       });
       const data = await res.json();
-
-      if (data.success && !data.requiresVerification) {
+      
+      if (data.success) {
         setUser(data.user);
         setAccessToken(data.accessToken);
         localStorage.setItem('user', JSON.stringify(data.user));
         localStorage.setItem('refreshToken', data.refreshToken);
       }
-
       return data;
     } catch (err) {
-      console.error('Login Error:', err);
-      return {
-        success: false,
-        message: err.message || 'Login failed. Please try again.'
-      };
+      console.error('Firebase Login Error:', err);
+      let msg = 'Login failed. Please check your credentials.';
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        msg = 'Invalid email or password.';
+      }
+      return { success: false, message: msg };
     }
   };
 
   const register = async (name, email, password, role = 'Creator') => {
     try {
-      const res = await fetch(`${API_BASE}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, role })
-      });
-      const data = await res.json();
-      return data;
+      const credential = await firebaseCreateWithEmail(email, password);
+      // Backend sync not strictly required here if they must verify email first,
+      // but we can just tell them it's sent.
+      return { success: true, message: 'Verification email sent. Please check your inbox and verify your email before logging in.' };
     } catch (err) {
-      console.error('Register Error:', err);
-      return {
-        success: false,
-        message: err.message || 'Registration failed. Please try again.'
-      };
+      console.error('Firebase Register Error:', err);
+      let msg = 'Registration failed. Please try again.';
+      if (err.code === 'auth/email-already-in-use') msg = 'Email is already registered.';
+      if (err.code === 'auth/weak-password') msg = 'Password is too weak. Please use at least 6 characters.';
+      return { success: false, message: msg };
     }
   };
 
-  const verifyOTP = async (email, otp, registrationToken = null) => {
-    try {
-      const res = await fetch(`${API_BASE}/auth/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp, registrationToken })
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        setUser(data.user);
-        setAccessToken(data.accessToken);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('refreshToken', data.refreshToken);
-      }
-
-      return data;
-    } catch (err) {
-      console.error('Verify Error:', err);
-      return { success: false, message: err.message || 'Verification failed.' };
-    }
-  };
+  
 
   const forgotPassword = async (email) => {
     try {
-      const res = await fetch(`${API_BASE}/auth/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
-      const data = await res.json();
-      return data;
+      await firebasePasswordReset(email);
+      return { success: true, message: 'Password reset email sent! Check your inbox.' };
     } catch (err) {
-      console.error('Forgot Password Error:', err);
-      return { success: false, message: err.message || 'Forgot password request failed.' };
+      console.error('Firebase Forgot Password Error:', err);
+      return { success: false, message: 'Failed to send reset email. Ensure the email is registered.' };
     }
   };
 
-  const resetPassword = async (token, newPassword) => {
-    try {
-      const res = await fetch(`${API_BASE}/auth/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, newPassword })
-      });
-      const data = await res.json();
-      return data;
-    } catch (err) {
-      console.error('Reset Password Error:', err);
-      return { success: false, message: err.message || 'Password reset request failed.' };
-    }
-  };
+  
 
-  const verifyEmailToken = async (token) => {
-    try {
-      const res = await fetch(`${API_BASE}/auth/verify-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        setUser(data.user);
-        setAccessToken(data.accessToken);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('refreshToken', data.refreshToken);
-      }
-
-      return data;
-    } catch (err) {
-      console.error('Verify Email Token Error:', err);
-      return { success: false, message: err.message || 'Email verification failed.' };
-    }
-  };
+  
 
   // Called by Login/Register pages BEFORE triggering the social redirect.
   // We save the platform so we know which one to use when the redirect returns.
@@ -398,10 +361,7 @@ export const AuthProvider = ({ children }) => {
       loading,
       login,
       register,
-      verifyOTP,
       forgotPassword,
-      resetPassword,
-      verifyEmailToken,
       socialLogin,
       socialLoginSuccess,
       savePendingSocialPlatform,

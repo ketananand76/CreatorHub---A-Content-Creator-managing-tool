@@ -1,15 +1,12 @@
 import express from 'express';
 import {
-  register,
-  verifyEmail,
-  login,
+  adminLogin,
+  firebaseSync,
   socialLogin,
   refreshToken,
   setup2FA,
   verify2FA,
   disable2FA,
-  forgotPassword,
-  resetPassword,
   getProfile,
   updateProfile
 } from '../controllers/authController.js';
@@ -18,15 +15,11 @@ import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.post('/register', register);
-router.post('/verify-email', verifyEmail);
-router.post('/login', login);
-// Removed verifyLogin route
+router.post('/admin-login', adminLogin);
+router.post('/firebase-sync', firebaseSync);
 router.post('/social-login', socialLogin);
 router.post('/social-login-handle', socialLoginByHandle);
 router.post('/refresh-token', refreshToken);
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password', resetPassword);
 
 // Protected Auth & Profile Routes
 router.get('/profile', protect, getProfile);

@@ -7,7 +7,6 @@ import { NotificationProvider } from './context/NotificationContext';
 // Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
-import VerifyOTP from './pages/VerifyOTP';
 import ResetPassword from './pages/ResetPassword';
 import AdminLogin from './pages/AdminLogin';
 import Dashboard from './pages/Dashboard';
@@ -20,7 +19,6 @@ import SuperAdmin from './pages/SuperAdmin';
 import Support from './pages/Support';
 import SettingsPage from './pages/SettingsPage';
 import SocialTracker from './pages/SocialTracker';
-import VerifyEmail from './pages/VerifyEmail';
 import AuthSuccess from './pages/AuthSuccess';
 
 // Components
@@ -113,11 +111,8 @@ export default function App() {
               {/* Unprotected Auth routes */}
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              <Route path="/verify-otp" element={<VerifyOTP />} />
               <Route path="/forgot-password" element={<ResetPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/admin-login" element={<AdminLogin />} />
-              <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/auth-success" element={<AuthSuccess />} />
 
               {/* Protected Workspace Layout */}
