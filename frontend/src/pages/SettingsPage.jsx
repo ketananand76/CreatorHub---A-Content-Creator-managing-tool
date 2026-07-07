@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
-import { motion } from 'framer-motion';
-import { User, Shield, Info, Youtube, Instagram, Save, ShieldCheck } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { User, Shield, Info, Youtube, Instagram, Facebook, Save, ShieldCheck } from 'lucide-react';
+import SocialHandleModal from '../components/SocialHandleModal';
 
 export default function SettingsPage() {
-  const { user, authFetch, updateLocalUser } = useAuth();
+  const { user, authFetch, updateLocalUser, updateSocialData } = useAuth();
   const { showNotification } = useNotification();
 
   const [activeSubTab, setActiveSubTab] = useState('profile');
@@ -22,6 +23,28 @@ export default function SettingsPage() {
   const [youtubeLink, setYoutubeLink] = useState('');
   const [instagramLink, setInstagramLink] = useState('');
   const [tiktokLink, setTiktokLink] = useState('');
+  const [facebookLink, setFacebookLink] = useState('');
+  const [facebookFollowers, setFacebookFollowers] = useState(0);
+
+  const [socialModal, setSocialModal] = useState(null); // 'youtube', 'instagram', 'facebook'
+
+  const handleSocialConnectSuccess = (data) => {
+    showNotification(data.message, 'success');
+    updateSocialData(data.socialLinks, {
+      [socialModal]: data.metrics
+    });
+    // Update local state to reflect new data immediately
+    if (socialModal === 'youtube') {
+      setYoutubeLink(data.socialLinks.youtubeLink);
+      setYoutubeSubscribers(data.metrics.subscribers);
+    } else if (socialModal === 'instagram') {
+      setInstagramLink(data.socialLinks.instagramLink);
+      setInstagramFollowers(data.metrics.followers);
+    } else if (socialModal === 'facebook') {
+      setFacebookLink(data.socialLinks.facebookLink);
+      setFacebookFollowers(data.metrics.followers);
+    }
+  };
 
   // Fetch current user details on mount
   useEffect(() => {
@@ -41,6 +64,9 @@ export default function SettingsPage() {
           setYoutubeLink(p.youtubeLink || '');
           setInstagramLink(p.instagramLink || '');
           setTiktokLink(p.tiktokLink || '');
+          setFacebookLink(p.facebookLink || '');
+          setFacebookFollowers(p.facebookFollowers || 0);
+          updateLocalUser(p);
         }
       } catch (err) {
         console.error('Error fetching profile:', err);
@@ -65,7 +91,9 @@ export default function SettingsPage() {
           averageEngagement,
           youtubeLink,
           instagramLink,
-          tiktokLink
+          tiktokLink,
+          facebookLink,
+          facebookFollowers
         })
       });
       const data = await res.json();
@@ -183,37 +211,89 @@ export default function SettingsPage() {
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
-                  <Youtube className="w-3.5 h-3.5 text-red-500" /> YouTube Channel Link
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://youtube.com/@channel"
-                  value={youtubeLink}
-                  onChange={(e) => setYoutubeLink(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:ring-2 focus:ring-brand-500 outline-none text-slate-800 dark:text-white"
-                />
+              {/* YouTube */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Youtube className="w-4 h-4 text-red-500" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">YouTube</span>
+                  </div>
+                  {user?.youtubeLink ? (
+                    <span className="text-[10px] font-bold text-green-500 bg-green-500/10 px-2 py-1 rounded-full uppercase tracking-wider">Connected</span>
+                  ) : (
+                    <button type="button" onClick={() => setSocialModal('youtube')} className="text-[10px] font-bold text-brand-500 hover:text-brand-600 uppercase tracking-wider">Connect</button>
+                  )}
+                </div>
+                {user?.youtubeLink ? (
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-slate-800 dark:text-white truncate">{user.youtubeLink}</div>
+                    <div className="flex gap-4 text-xs text-slate-500">
+                      <span><strong className="text-slate-700 dark:text-slate-300">{user.socialMetrics?.youtube?.subscribers?.toLocaleString() || 0}</strong> Subs</span>
+                      <span><strong className="text-slate-700 dark:text-slate-300">{user.socialMetrics?.youtube?.views?.toLocaleString() || 0}</strong> Views</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-400">Connect to track live metrics</div>
+                )}
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
-                  <Instagram className="w-3.5 h-3.5 text-pink-500" /> Instagram Handle Link
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://instagram.com/handle"
-                  value={instagramLink}
-                  onChange={(e) => setInstagramLink(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:ring-2 focus:ring-brand-500 outline-none text-slate-800 dark:text-white"
-                />
+              {/* Instagram */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Instagram className="w-4 h-4 text-pink-500" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Instagram</span>
+                  </div>
+                  {user?.instagramLink ? (
+                    <span className="text-[10px] font-bold text-green-500 bg-green-500/10 px-2 py-1 rounded-full uppercase tracking-wider">Connected</span>
+                  ) : (
+                    <button type="button" onClick={() => setSocialModal('instagram')} className="text-[10px] font-bold text-brand-500 hover:text-brand-600 uppercase tracking-wider">Connect</button>
+                  )}
+                </div>
+                {user?.instagramLink ? (
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-slate-800 dark:text-white truncate">{user.instagramLink}</div>
+                    <div className="flex gap-4 text-xs text-slate-500">
+                      <span><strong className="text-slate-700 dark:text-slate-300">{user.socialMetrics?.instagram?.followers?.toLocaleString() || 0}</strong> Followers</span>
+                      <span><strong className="text-slate-700 dark:text-slate-300">{user.socialMetrics?.instagram?.posts?.toLocaleString() || 0}</strong> Posts</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-400">Connect to track live metrics</div>
+                )}
+              </div>
+
+              {/* Facebook */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Facebook className="w-4 h-4 text-blue-500" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Facebook</span>
+                  </div>
+                  {user?.facebookLink ? (
+                    <span className="text-[10px] font-bold text-green-500 bg-green-500/10 px-2 py-1 rounded-full uppercase tracking-wider">Connected</span>
+                  ) : (
+                    <button type="button" onClick={() => setSocialModal('facebook')} className="text-[10px] font-bold text-brand-500 hover:text-brand-600 uppercase tracking-wider">Connect</button>
+                  )}
+                </div>
+                {user?.facebookLink ? (
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-slate-800 dark:text-white truncate">{user.facebookLink}</div>
+                    <div className="flex gap-4 text-xs text-slate-500">
+                      <span><strong className="text-slate-700 dark:text-slate-300">{user.socialMetrics?.facebook?.followers?.toLocaleString() || 0}</strong> Followers</span>
+                      <span><strong className="text-slate-700 dark:text-slate-300">{user.socialMetrics?.facebook?.likes?.toLocaleString() || 0}</strong> Likes</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-400">Connect to track live metrics</div>
+                )}
               </div>
             </div>
           </div>
 
           {/* Metrics section (1 column) */}
           <div className="glass p-6 rounded-2xl border flex flex-col justify-between space-y-6">
-            <div className="space-y-6">
+            <div className="space-y-6 hidden">
               <h3 className="font-bold text-sm text-slate-800 dark:text-white border-b dark:border-slate-800 pb-2">
                 Growth Metrics
               </h3>
@@ -240,6 +320,19 @@ export default function SettingsPage() {
                   placeholder="0"
                   value={instagramFollowers}
                   onChange={(e) => setInstagramFollowers(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:ring-2 focus:ring-brand-500 outline-none text-slate-800 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Facebook Followers
+                </label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={facebookFollowers}
+                  onChange={(e) => setFacebookFollowers(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:ring-2 focus:ring-brand-500 outline-none text-slate-800 dark:text-white"
                 />
               </div>
@@ -323,6 +416,17 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+      {/* Social Handle Modal for Connection */}
+      <AnimatePresence>
+        {socialModal && (
+          <SocialHandleModal
+            platform={socialModal}
+            mode="connect"
+            onClose={() => setSocialModal(null)}
+            onSuccess={handleSocialConnectSuccess}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -556,9 +556,13 @@ export default function Subscription() {
                 </div>
 
                 <div className="text-center py-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-dashed dark:border-slate-800">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Simulated QR Code</span>
-                  <div className="w-32 h-32 bg-slate-200 dark:bg-slate-800 flex items-center justify-center mx-auto my-3 rounded-lg text-[10px] text-slate-400">
-                    QR: 9771735011@mbk
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Scan to Pay ₹999</span>
+                  <div className="w-32 h-32 bg-white flex items-center justify-center mx-auto my-3 rounded-lg p-1">
+                    <img 
+                      src={`https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent('upi://pay?pa=9771735011@mbk&pn=CreatorHub&am=999&cu=INR')}`} 
+                      alt="UPI QR Code"
+                      className="w-full h-full"
+                    />
                   </div>
                   <p className="text-[10px] text-slate-400 px-8 leading-normal">
                     Scan via any UPI App (GPay, PhonePe, Paytm, BHIM) to make the payment.

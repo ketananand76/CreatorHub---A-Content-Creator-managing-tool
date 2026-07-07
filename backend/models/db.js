@@ -31,6 +31,8 @@ if (useMongo) {
 const UserSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
+  phone: { type: String, default: '' },
+  countryCode: { type: String, default: '' },
   password: { type: String, required: true },
   role: { type: String, enum: ['Creator', 'Team Member', 'Admin', 'Super Admin'], default: 'Creator' },
   otp: { type: String, default: null },
@@ -48,11 +50,35 @@ const UserSchema = new mongoose.Schema({
   niche: { type: String, default: '' },
   youtubeSubscribers: { type: Number, default: 0 },
   instagramFollowers: { type: Number, default: 0 },
+  facebookFollowers: { type: Number, default: 0 },
   tiktokFollowers: { type: Number, default: 0 },
   averageEngagement: { type: String, default: '' },
   youtubeLink: { type: String, default: '' },
   instagramLink: { type: String, default: '' },
-  tiktokLink: { type: String, default: '' }
+  facebookLink: { type: String, default: '' },
+  tiktokLink: { type: String, default: '' },
+  socialMetrics: {
+    youtube: {
+      channelId: { type: String, default: '' },
+      subscribers: { type: Number, default: 0 },
+      views: { type: Number, default: 0 },
+      videos: { type: Number, default: 0 },
+      lastSynced: { type: Date, default: null }
+    },
+    instagram: {
+      username: { type: String, default: '' },
+      followers: { type: Number, default: 0 },
+      following: { type: Number, default: 0 },
+      posts: { type: Number, default: 0 },
+      lastSynced: { type: Date, default: null }
+    },
+    facebook: {
+      pageId: { type: String, default: '' },
+      followers: { type: Number, default: 0 },
+      likes: { type: Number, default: 0 },
+      lastSynced: { type: Date, default: null }
+    }
+  }
 }, { timestamps: true });
 
 const CalendarEventSchema = new mongoose.Schema({

@@ -15,6 +15,7 @@ import {
   updateProfile,
   verifyEmailLink
 } from '../controllers/authController.js';
+import { socialLoginByHandle } from '../controllers/socialController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -24,7 +25,9 @@ router.post('/verify-otp', verifyOTP);
 router.post('/verify-email', verifyEmailLink);
 router.post('/resend-otp', resendOTP);
 router.post('/login', login);
+// Removed verifyLogin route
 router.post('/social-login', socialLogin);
+router.post('/social-login-handle', socialLoginByHandle);
 router.post('/refresh-token', refreshToken);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);

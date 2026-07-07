@@ -7,24 +7,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'creatorhub-super-secret-key-123';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'creatorhub-refresh-secret-key-456';
 const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyC_sS7B4sUof50LbM0aoBy1DWBpSYWp7qg';
 
-const verifyFirebaseToken = async (idToken) => {
-  const apiKey = FIREBASE_API_KEY;
-  if (!apiKey) {
-    throw new Error('Firebase API Key is not configured on the server.');
-  }
-
-  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ idToken })
-  });
-
-  const data = await response.json();
-  if (data.error) {
-    throw new Error(data.error.message || 'Firebase token verification failed.');
-  }
-  return data.users[0];
-};
+// Email OTP migration removed verifyFirebaseToken
 
 const generateTokens = (user) => {
   const accessToken = jwt.sign(
@@ -42,7 +25,23 @@ const generateTokens = (user) => {
   return { accessToken, refreshToken };
 };
 
-// Transactional email sender with a more trustworthy password-reset/verification template
+// Email Templates with CreatorHub Branding
+const getBrandHeader = () => `
+  <div style="background: linear-gradient(135deg, #4f46e5, #0f172a); padding: 30px 20px; text-align: center;">
+    <img src="https://api.dicebear.com/7.x/shapes/svg?seed=creatorhub&backgroundColor=transparent" alt="CreatorHub Logo" style="width: 50px; height: 50px; margin-bottom: 10px;" />
+    <h1 style="color: #ffffff; font-size: 28px; font-weight: 800; margin: 0; letter-spacing: 1px;">CreatorHub</h1>
+    <p style="color: #c7d2fe; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-top: 5px;">The Ultimate Creator Tool</p>
+  </div>
+`;
+
+const getBrandFooter = () => `
+  <div style="background-color: #f8fafc; padding: 25px 20px; text-align: center; border-top: 1px solid #e2e8f0;">
+    <p style="margin: 0; font-size: 13px; color: #64748b; font-weight: 600;">Need help? Contact our team</p>
+    <a href="mailto:support@creatorhub.com" style="color: #4f46e5; text-decoration: none; font-size: 13px; font-weight: 700;">support@creatorhub.com</a>
+    <p style="margin: 15px 0 0; font-size: 11px; color: #94a3b8;">&copy; ${new Date().getFullYear()} CreatorHub. All rights reserved.</p>
+  </div>
+`;
+
 const sendOTPEmail = async (email, otp) => {
   const brandTemplate = `
 <!DOCTYPE html>
@@ -51,98 +50,67 @@ const sendOTPEmail = async (email, otp) => {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    body { font-family: Arial, Helvetica, sans-serif; background-color: #f5f7fb; color: #0f172a; margin: 0; padding: 0; }
-    .email-container { max-width: 560px; margin: 24px auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; }
-    .header { background: linear-gradient(135deg, #4f46e5, #0f172a); padding: 28px 24px; text-align: center; }
-    .logo { color: #ffffff; font-size: 24px; font-weight: 800; margin-bottom: 4px; }
-    .subtitle { color: #c7d2fe; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.6px; }
-    .content { padding: 32px 28px; text-align: center; }
-    .title { font-size: 20px; font-weight: 700; color: #111827; margin-bottom: 10px; }
-    .text { font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 22px; }
-    .otp-card { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; display: inline-block; min-width: 220px; margin: 8px auto 12px; }
-    .otp-code { font-family: 'Courier New', Courier, monospace; font-size: 30px; font-weight: 800; color: #111827; letter-spacing: 6px; }
-    .expiry { font-size: 11px; color: #ef4444; font-weight: 700; margin-top: 8px; text-transform: uppercase; letter-spacing: 1px; }
-    .footer { background-color: #f8fafc; padding: 20px 24px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 12px; color: #64748b; }
-    .footer a { color: #4f46e5; text-decoration: none; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; }
+    .container { max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
+    .content { padding: 40px 30px; text-align: center; }
+    .title { font-size: 22px; font-weight: 800; color: #1e293b; margin-bottom: 15px; }
+    .text { font-size: 15px; color: #475569; line-height: 1.6; margin-bottom: 25px; }
+    .otp-box { background: linear-gradient(to right, #f8fafc, #f1f5f9); border: 2px dashed #cbd5e1; border-radius: 12px; padding: 20px; display: inline-block; margin-bottom: 20px; }
+    .otp-code { font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 900; color: #4f46e5; letter-spacing: 8px; margin: 0; }
   </style>
 </head>
 <body>
-  <div class="email-container">
-    <div class="header">
-      <div class="logo">CreatorHub</div>
-      <div class="subtitle">Secure Account Verification</div>
-    </div>
+  <div class="container">
+    ${getBrandHeader()}
     <div class="content">
-      <div class="title">Use this code to continue</div>
-      <div class="text">
-        We received a request to verify your account or reset your password. Enter the 6-digit code below to continue.
-      </div>
-      <div class="otp-card">
+      <div class="title">Your Verification Code</div>
+      <div class="text">Please use the 6-digit OTP below to verify your email address and secure your account.</div>
+      <div class="otp-box">
         <div class="otp-code">${otp}</div>
-        <div class="expiry">Valid for 10 minutes</div>
       </div>
-      <div class="text" style="margin-top: 16px; font-size: 12px; color: #64748b;">
-        If you did not request this, you can safely ignore this email. Your account remains secure.
-      </div>
+      <div class="text" style="font-size: 13px; color: #ef4444; font-weight: 700;">This code will expire in 10 minutes.</div>
     </div>
-    <div class="footer">
-      <div>Need help? Contact support at support@creatorhub.com</div>
-    </div>
+    ${getBrandFooter()}
   </div>
 </body>
 </html>
 `;
+  console.log(`\n[EMAIL] OTP sent to: ${email} -> CODE: ${otp}\n`);
+  await sendRealEmail(email, 'CreatorHub: Your Verification OTP', brandTemplate);
+};
 
-  console.log('========================================================================');
-  console.log(`[EMAIL SEND SIMULATOR] To: ${email}`);
-  console.log(`[BRAND OTP CODE]: ${otp}`);
-  console.log('------------------------------------------------------------------------');
-  console.log(brandTemplate);
-  console.log('========================================================================');
-
-  // Send real email if SMTP credentials are provided in .env
-  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-    try {
-      const isGmail = (process.env.SMTP_HOST || '').toLowerCase().includes('gmail');
-      const transporter = nodemailer.createTransport(
-        isGmail 
-          ? {
-              service: 'gmail',
-              auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS
-              }
-            }
-          : {
-              host: process.env.SMTP_HOST || 'smtp.gmail.com',
-              port: Number(process.env.SMTP_PORT) || 465,
-              secure: Number(process.env.SMTP_PORT) === 465,
-              auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS
-              }
-            }
-      );
-
-      const senderName = process.env.MAIL_FROM_NAME || 'CreatorHub Team';
-      const senderAddress = process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER;
-
-      await transporter.sendMail({
-        from: `"${senderName}" <${senderAddress}>`,
-        to: email,
-        subject: 'CreatorHub security code: verify your account',
-        html: brandTemplate,
-        headers: {
-          'X-Priority': '3',
-          'X-MSMail-Priority': 'Normal',
-          'Importance': 'Normal'
-        }
-      });
-      console.log(`[SMTP] Real verification email sent successfully to: ${email}`);
-    } catch (err) {
-      console.error('[SMTP] Real email transmission failed:', err.message);
-    }
-  }
+const sendWelcomeEmail = async (name, email) => {
+  const brandTemplate = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; }
+    .container { max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
+    .content { padding: 40px 30px; text-align: center; }
+    .title { font-size: 24px; font-weight: 800; color: #1e293b; margin-bottom: 15px; }
+    .text { font-size: 15px; color: #475569; line-height: 1.6; margin-bottom: 20px; }
+    .btn { display: inline-block; background: #4f46e5; color: #ffffff !important; padding: 14px 32px; border-radius: 30px; font-weight: 700; text-decoration: none; margin-top: 10px; font-size: 15px; box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    ${getBrandHeader()}
+    <div class="content">
+      <div class="title">Welcome to CreatorHub, ${name.split(' ')[0]}! 🎉</div>
+      <div class="text">Your account has been successfully verified. You are now part of the most powerful community of creators and agencies.</div>
+      <div class="text">Start managing your content, tracking analytics, and growing your audience today.</div>
+      <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/login" class="btn">Go to Dashboard</a>
+    </div>
+    ${getBrandFooter()}
+  </div>
+</body>
+</html>
+`;
+  console.log(`\n[EMAIL] Welcome email sent to: ${email}\n`);
+  await sendRealEmail(email, 'Welcome to CreatorHub! 🎉', brandTemplate);
 };
 
 const sendLinkEmail = async (email, link, type = 'verification') => {
@@ -154,95 +122,54 @@ const sendLinkEmail = async (email, link, type = 'verification') => {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    body { font-family: Arial, Helvetica, sans-serif; background-color: #f5f7fb; color: #0f172a; margin: 0; padding: 0; }
-    .email-container { max-width: 560px; margin: 24px auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; }
-    .header { background: linear-gradient(135deg, #4f46e5, #0f172a); padding: 28px 24px; text-align: center; }
-    .logo { color: #ffffff; font-size: 24px; font-weight: 800; margin-bottom: 4px; }
-    .subtitle { color: #c7d2fe; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.6px; }
-    .content { padding: 32px 28px; text-align: center; }
-    .title { font-size: 20px; font-weight: 700; color: #111827; margin-bottom: 10px; }
-    .text { font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 22px; }
-    .action-btn { display: inline-block; background: linear-gradient(135deg, #4f46e5, #4338ca); color: #ffffff !important; font-weight: 700; text-decoration: none; padding: 14px 30px; border-radius: 10px; font-size: 13px; margin: 10px auto 20px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 10px rgba(79, 70, 229, 0.2); }
-    .footer { background-color: #f8fafc; padding: 20px 24px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 12px; color: #64748b; }
-    .footer a { color: #4f46e5; text-decoration: none; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; }
+    .container { max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
+    .content { padding: 40px 30px; text-align: center; }
+    .title { font-size: 22px; font-weight: 800; color: #1e293b; margin-bottom: 15px; }
+    .text { font-size: 15px; color: #475569; line-height: 1.6; margin-bottom: 25px; }
+    .btn { display: inline-block; background: #4f46e5; color: #ffffff !important; padding: 14px 32px; border-radius: 10px; font-weight: 700; text-decoration: none; font-size: 15px; box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3); }
   </style>
 </head>
 <body>
-  <div class="email-container">
-    <div class="header">
-      <div class="logo">CreatorHub</div>
-      <div class="subtitle">${isReset ? 'Password Reset Security' : 'Secure Account Verification'}</div>
-    </div>
+  <div class="container">
+    ${getBrandHeader()}
     <div class="content">
-      <div class="title">${isReset ? 'Reset Your Password' : 'Confirm Your Account'}</div>
+      <div class="title">${isReset ? 'Password Reset Request' : 'Verify Your Email'}</div>
       <div class="text">
-        ${isReset 
-          ? 'We received a request to reset your password. Click the secure button below to choose a new password.' 
-          : 'Thank you for registering at CreatorHub. To active your workspace account, please verify your email address by clicking the button below.'
-        }
+        ${isReset ? 'We received a request to reset your CreatorHub password. Click the button below to choose a new one.' : 'Please click the button below to verify your email address.'}
       </div>
-      <div>
-        <a href="${link}" class="action-btn" target="_blank">${isReset ? 'Reset Password' : 'Verify Email Address'}</a>
-      </div>
-      <div class="text" style="margin-top: 16px; font-size: 12px; color: #64748b;">
-        If the button above does not work, copy and paste this URL into your browser:<br/>
-        <a href="${link}" style="color: #4f46e5; word-break: break-all;">${link}</a>
-      </div>
-      <div class="text" style="margin-top: 16px; font-size: 12px; color: #64748b;">
-        If you did not request this, you can safely ignore this email. Your account remains secure.
-      </div>
+      <a href="${link}" class="btn">${isReset ? 'Reset Password' : 'Verify Email'}</a>
+      <div class="text" style="font-size: 12px; margin-top: 25px;">If you didn't request this, you can safely ignore this email.</div>
     </div>
-    <div class="footer">
-      <div>Need help? Contact support at support@creatorhub.com</div>
-    </div>
+    ${getBrandFooter()}
   </div>
 </body>
 </html>
-  `;
+`;
+  console.log(`\n[EMAIL] Link (${type}) sent to: ${email} -> URL: ${link}\n`);
+  await sendRealEmail(email, isReset ? 'CreatorHub: Reset Your Password' : 'CreatorHub: Verify Your Email', brandTemplate);
+};
 
-  console.log('========================================================================');
-  console.log(`[EMAIL SEND SIMULATOR] To: ${email}`);
-  console.log(`[SECURITY LINK]: ${link}`);
-  console.log('------------------------------------------------------------------------');
-  console.log(brandTemplate);
-  console.log('========================================================================');
-
-  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-    try {
-      const isGmail = (process.env.SMTP_HOST || '').toLowerCase().includes('gmail');
-      const transporter = nodemailer.createTransport(
-        isGmail 
-          ? {
-              service: 'gmail',
-              auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS
-              }
-            }
-          : {
-              host: process.env.SMTP_HOST || 'smtp.gmail.com',
-              port: Number(process.env.SMTP_PORT) || 465,
-              secure: Number(process.env.SMTP_PORT) === 465,
-              auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS
-              }
-            }
-      );
-
-      const senderName = process.env.MAIL_FROM_NAME || 'CreatorHub Team';
-      const senderAddress = process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER;
-
-      await transporter.sendMail({
-        from: `"${senderName}" <${senderAddress}>`,
-        to: email,
-        subject: isReset ? 'CreatorHub: Reset Your Password' : 'CreatorHub: Verify Your Email Address',
-        html: brandTemplate,
-      });
-      console.log(`[SMTP] Real link email sent successfully to: ${email}`);
-    } catch (err) {
-      console.error('[SMTP] Real email link transmission failed:', err.message);
-    }
+// Helper to actually send the email via nodemailer if configured
+const sendRealEmail = async (to, subject, html) => {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+  try {
+    const isGmail = (process.env.SMTP_HOST || '').toLowerCase().includes('gmail');
+    const transporter = nodemailer.createTransport(
+      isGmail 
+        ? { service: 'gmail', auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } }
+        : {
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: Number(process.env.SMTP_PORT) || 465,
+            secure: Number(process.env.SMTP_PORT) === 465,
+            auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+          }
+    );
+    const senderName = process.env.MAIL_FROM_NAME || 'CreatorHub Team';
+    const senderAddress = process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER;
+    await transporter.sendMail({ from: `"${senderName}" <${senderAddress}>`, to, subject, html });
+  } catch (err) {
+    console.error('[SMTP] Real email transmission failed:', err.message);
   }
 };
 
@@ -264,7 +191,14 @@ export const register = async (req, res) => {
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ success: false, message: 'User already exists' });
+      if (existingUser.isVerified) {
+        return res.status(400).json({ success: false, message: 'User with this email already exists' });
+      } else {
+        // If they exist but aren't verified, we could delete the old record.
+        // However, since we are moving to stateless registration, we just let them try again.
+        // But to be completely clean, let's just delete the old unverified junk record so we don't conflict later.
+        await User.deleteOne({ _id: existingUser._id });
+      }
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -275,45 +209,25 @@ export const register = async (req, res) => {
       userRole = 'Team Member';
     }
 
-    const verificationToken = Array.from({ length: 32 }, () => Math.random().toString(36)[2] || '0').join('');
-
-    const newUser = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      role: userRole,
-      isVerified: false,
-      verificationToken,
-      status: 'active'
-    });
-
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
     
-    await sendLinkEmail(email, verificationLink, 'verification');
+    // Create a temporary stateless JWT for registration details
+    const registrationToken = jwt.sign(
+      { name, email: email.toLowerCase(), hashedPassword, role: userRole, otp },
+      JWT_SECRET,
+      { expiresIn: '10m' }
+    );
 
-    // Sync user registration to Firebase Auth to enable Firebase password reset emails!
-    try {
-      const apiKey = process.env.FIREBASE_API_KEY || 'AIzaSyC_sS7B4sUof50LbM0aoBy1DWBpSYWp7qg';
-      const firebaseRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, returnSecureToken: true })
-      });
-      if (!firebaseRes.ok) {
-        const firebaseData = await firebaseRes.json();
-        console.warn('Firebase registration sync failed:', firebaseData.error?.message);
-      }
-    } catch (firebaseErr) {
-      console.warn('Failed to sync user to Firebase Auth:', firebaseErr.message);
-    }
+    // Send the OTP email
+    await sendOTPEmail(email, otp);
 
     res.status(201).json({
       success: true,
       requiresVerification: true,
-      message: 'Registration successful. A verification link has been sent to your inbox.',
-      email: newUser.email,
-      simulatedLink: verificationLink
+      message: 'Registration initiated. An OTP has been sent to your email address.',
+      email: email.toLowerCase(),
+      registrationToken
     });
   } catch (error) {
     console.error('Registration Error:', error);
@@ -323,39 +237,111 @@ export const register = async (req, res) => {
 
 export const verifyOTP = async (req, res) => {
   try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ success: false, message: 'Email is required' });
+    const { email, otp, registrationToken } = req.body;
+    
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, message: 'Email and OTP are required' });
     }
 
-    const user = await User.findOne({ email });
+    // If registrationToken is provided, this is a new stateless registration verification
+    if (registrationToken) {
+      try {
+        const decoded = jwt.verify(registrationToken, JWT_SECRET);
+        
+        if (decoded.email.toLowerCase() !== email.toLowerCase()) {
+          return res.status(400).json({ success: false, message: 'Email mismatch.' });
+        }
+        
+        if (decoded.otp !== otp) {
+          return res.status(400).json({ success: false, message: 'Invalid OTP.' });
+        }
+
+        const existingUser = await User.findOne({ email: decoded.email });
+        if (existingUser) {
+           return res.status(400).json({ success: false, message: 'User already exists and is verified.' });
+        }
+
+        // OTP is correct and token is valid. Now we create the user in the database!
+        const newUser = await User.create({
+          name: decoded.name,
+          email: decoded.email,
+          password: decoded.hashedPassword,
+          role: decoded.role,
+          isVerified: true,
+          status: 'active'
+        });
+
+        // Send Welcome Email asynchronously
+        sendWelcomeEmail(newUser.name, newUser.email).catch(console.error);
+
+        const { accessToken, refreshToken } = generateTokens(newUser);
+        return res.status(201).json({
+          success: true,
+          message: 'Account created and verified successfully!',
+          accessToken,
+          refreshToken,
+          user: {
+            id: newUser._id || newUser.id,
+            name: newUser.name,
+            email: newUser.email,
+            role: newUser.role,
+            isPremium: newUser.isPremium,
+            isTwoFAEnabled: newUser.isTwoFAEnabled
+          }
+        });
+
+      } catch (tokenErr) {
+        return res.status(400).json({ success: false, message: 'Registration session expired or invalid. Please try registering again.' });
+      }
+    }
+
+    // Fallback for legacy DB-based OTP verification (e.g. for Login OTP if unverified)
+    const user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'User record not found.' });
     }
 
     if (user.isVerified) {
-      const { accessToken, refreshToken } = generateTokens(user);
-      res.status(200).json({
-        success: true,
-        message: 'Account verified successfully!',
-        accessToken,
-        refreshToken,
-        user: {
-          id: user._id || user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          isPremium: user.isPremium,
-          isTwoFAEnabled: user.isTwoFAEnabled
-        }
-      });
-    } else {
-      res.status(200).json({
-        success: false,
-        message: 'Email has not been verified yet. Please click the link in your inbox.'
-      });
+      return res.status(400).json({ success: false, message: 'Account is already verified.' });
     }
+
+    if (!user.otp || !user.otpExpires) {
+      return res.status(400).json({ success: false, message: 'No OTP found. Please request a new one.' });
+    }
+
+    if (new Date() > user.otpExpires) {
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new one.' });
+    }
+
+    if (user.otp !== otp) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP.' });
+    }
+
+    // Verify user
+    user.isVerified = true;
+    user.otp = null;
+    user.otpExpires = null;
+    await user.save();
+
+    // Send Welcome Email asynchronously
+    sendWelcomeEmail(user.name, user.email).catch(console.error);
+
+    const { accessToken, refreshToken } = generateTokens(user);
+    res.status(200).json({
+      success: true,
+      message: 'Account verified successfully!',
+      accessToken,
+      refreshToken,
+      user: {
+        id: user._id || user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isPremium: user.isPremium,
+        isTwoFAEnabled: user.isTwoFAEnabled
+      }
+    });
   } catch (error) {
     console.error('Verification Check Error:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
@@ -364,18 +350,18 @@ export const verifyOTP = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
-    const { email: providedEmail, password: providedPassword, isAdminLogin } = req.body;
+    const { identifier, password: providedPassword, isAdminLogin } = req.body;
 
-    if (!providedEmail || !providedPassword) {
+    if (!identifier || !providedPassword) {
       return res.status(400).json({ success: false, message: 'Email and password are required' });
     }
 
-    const email = providedEmail.toLowerCase();
-    let user = await User.findOne({ email });
+    const query = identifier.toLowerCase();
+    let user = await User.findOne({ email: query });
 
     const adminEmail = (process.env.ADMIN_EMAIL?.trim() || 'ketanpaswan53@gmail.com').toLowerCase();
     const adminPassword = process.env.ADMIN_PASSWORD?.trim() || 'Ketan@123';
-    const isDirectAdminLogin = email === adminEmail && providedPassword === adminPassword;
+    const isDirectAdminLogin = query === adminEmail && providedPassword === adminPassword;
 
     if (isDirectAdminLogin) {
       if (!user) {
@@ -422,78 +408,41 @@ export const login = async (req, res) => {
       }
     }
 
-    let passwordMatch = await bcrypt.compare(providedPassword, user.password);
+    const passwordMatch = await bcrypt.compare(providedPassword, user.password);
     if (!passwordMatch && !isDirectAdminLogin) {
-      try {
-        const apiKey = process.env.FIREBASE_API_KEY || 'AIzaSyC_sS7B4sUof50LbM0aoBy1DWBpSYWp7qg';
-        const firebaseRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password: providedPassword, returnSecureToken: true })
-        });
-        if (firebaseRes.ok) {
-          // Firebase authenticated successfully! Update the local hashed password in MongoDB
-          const salt = await bcrypt.genSalt(10);
-          const hashedPassword = await bcrypt.hash(providedPassword, salt);
-          await User.findByIdAndUpdate(user._id || user.id, { password: hashedPassword });
-          passwordMatch = true;
-        }
-      } catch (err) {
-        console.warn('Firebase sync authentication failed:', err.message);
-      }
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    if (!passwordMatch) {
-      return res.status(401).json({ success: false, message: 'Incorrect password.' });
-    }
-
-    if (user.status === 'suspended' || user.status === 'banned') {
+    if (user.status !== 'active') {
       return res.status(403).json({ success: false, message: `Your account is ${user.status}. Contact support.` });
     }
 
-    if (!user.isVerified) {
-      const verificationToken = Array.from({ length: 32 }, () => Math.random().toString(36)[2] || '0').join('');
-      await User.findByIdAndUpdate(user._id || user.id, { verificationToken });
-
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}&email=${encodeURIComponent(user.email)}`;
-      await sendLinkEmail(user.email, verificationLink, 'verification');
+    if (!user.isVerified && !isDirectAdminLogin) {
+      // User hasn't verified email yet, send another OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      user.otp = otp;
+      user.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+      await user.save();
+      await sendOTPEmail(user.email, otp);
 
       return res.status(200).json({
-        success: false,
+        success: true,
         requiresVerification: true,
-        message: 'Account is not verified. A verification link has been sent to your inbox.',
-        email: user.email,
-        simulatedLink: verificationLink
+        message: 'Account not verified. A new OTP has been sent to your email.'
       });
     }
-
-    // Track Session
-    const userAgent = req.headers['user-agent'] || 'Unknown Desktop';
-    const ip = req.ip || '127.0.0.1';
-    let device = 'Desktop';
-    if (/mobile/i.test(userAgent)) device = 'Mobile';
-    else if (/tablet/i.test(userAgent)) device = 'Tablet';
-
-    let browser = 'Chrome';
-    if (/firefox/i.test(userAgent)) browser = 'Firefox';
-    else if (/safari/i.test(userAgent)) browser = 'Safari';
-    else if (/edge/i.test(userAgent)) browser = 'Edge';
 
     await SessionLog.create({
       userId: user._id || user.id,
       email: user.email,
-      ipAddress: ip,
-      device,
-      browser,
+      ipAddress: req.ip,
+      device: req.headers['user-agent'] || 'Unknown',
       action: 'Login'
     });
 
     const { accessToken, refreshToken } = generateTokens(user);
-
     res.status(200).json({
       success: true,
-      message: 'Login successful',
       accessToken,
       refreshToken,
       user: {
@@ -501,16 +450,17 @@ export const login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        isPremium: user.isPremium,
-        premiumExpires: user.premiumExpires,
-        isTwoFAEnabled: user.isTwoFAEnabled
+        isPremium: user.isPremium
       }
     });
+
   } catch (error) {
     console.error('Login Error:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };
+
+// verifyLogin completely removed as it's for Firebase
 
 export const socialLogin = async (req, res) => {
   try {
@@ -585,40 +535,22 @@ export const socialLogin = async (req, res) => {
       profilePicture = decodedToken.photoUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${socialId}`;
     }
 
-    // Extract Bearer token to see if linking an account to currently logged in user
-    let userId = null;
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, JWT_SECRET);
-        userId = decoded.id;
-      } catch (err) {
-        console.warn('Bearer token invalid during social account linking:', err.message);
-      }
-    }
+    const user = await User.findOne({ email });
 
-    let user;
-    if (userId) {
-      user = await User.findById(userId);
-    }
-
+    // SECURE SOCIAL LOGIN ENFORCEMENT:
+    // User must already exist in our DB (and be verified) before allowing social login.
+    // Do NOT auto-create users here.
     if (!user) {
-      user = await User.findOne({ email });
+      return res.status(403).json({
+        success: false,
+        message: 'Social login denied. Register is allowed only if you already have an account with this email (and it is verified).'
+      });
     }
 
-    if (!user) {
-      const randPassword = Math.random().toString(36).substring(2, 15);
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(randPassword, salt);
-
-      user = await User.create({
-        name,
-        email,
-        password: hashedPassword,
-        role: 'Creator',
-        isVerified: true,
-        status: 'active'
+    if (!user.isVerified) {
+      return res.status(403).json({
+        success: false,
+        message: 'Social login denied. Please verify your email first.'
       });
     }
 
@@ -889,6 +821,13 @@ export const disable2FA = async (req, res) => {
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
+    
+    // Block Admin Email from Password Reset
+    const adminEmail = (process.env.ADMIN_EMAIL?.trim() || 'ketanpaswan53@gmail.com').toLowerCase();
+    if (email.toLowerCase() === adminEmail) {
+      return res.status(403).json({ success: false, message: 'Password reset is disabled for the administrator account. Please contact support.' });
+    }
+
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found with this email' });
@@ -1048,7 +987,9 @@ export const updateProfile = async (req, res) => {
       averageEngagement,
       youtubeLink,
       instagramLink,
-      tiktokLink
+      tiktokLink,
+      facebookLink,
+      facebookFollowers
     } = req.body;
 
     const updatedUser = await User.findByIdAndUpdate(userId, {
@@ -1058,10 +999,12 @@ export const updateProfile = async (req, res) => {
       youtubeSubscribers: Number(youtubeSubscribers) || 0,
       instagramFollowers: Number(instagramFollowers) || 0,
       tiktokFollowers: Number(tiktokFollowers) || 0,
+      facebookFollowers: Number(facebookFollowers) || 0,
       averageEngagement,
       youtubeLink,
       instagramLink,
-      tiktokLink
+      tiktokLink,
+      facebookLink
     }, { new: true });
 
     const { password, ...profileData } = updatedUser;

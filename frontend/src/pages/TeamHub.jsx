@@ -70,11 +70,10 @@ export default function TeamHub() {
 
     const interval = setInterval(async () => {
       try {
-        const cRes = await authFetch(`/team/chat?creatorId=${activeChannelId}`);
+        // Always poll the same active channel
+        const cRes = await authFetch(`/team/chat?channelId=${activeChannelId}`);
         const cData = await cRes.json();
-        if (cData.success) {
-          setMessages(cData.messages);
-        }
+        if (cData.success) setMessages(cData.messages);
       } catch (err) {
         // Silent refresh error
       }

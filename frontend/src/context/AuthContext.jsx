@@ -112,16 +112,12 @@ export const AuthProvider = ({ children }) => {
           if (data.success) {
             setAccessToken(data.accessToken);
             localStorage.setItem('refreshToken', data.refreshToken);
+          } else {
+            logout();
           }
         } catch (e) {
           console.error('Interval token refresh failed:', e);
-          // If refresh endpoint returns HTML/404, avoid breaking app state
-          try {
-            localStorage.removeItem('refreshToken');
-            localStorage.removeItem('user');
-          } catch (_) {}
-          setUser(null);
-          setAccessToken(null);
+          logout();
         }
       }
     }, 10 * 60 * 1000);
@@ -159,8 +155,9 @@ export const AuthProvider = ({ children }) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token: localStorage.getItem('refreshToken') })
         });
-        const refreshData = await refreshRes.json();
-        if (refreshData.success) {
+
+        const refreshData = await refreshRes.json().catch(() => null);
+        if (refreshRes.ok && refreshData?.success) {
           setAccessToken(refreshData.accessToken);
           localStorage.setItem('refreshToken', refreshData.refreshToken);
           headers['Authorization'] = `Bearer ${refreshData.accessToken}`;
@@ -170,8 +167,10 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (err) {
         console.error('AuthFetch Refresh Failure:', err);
+        logout();
       }
     }
+
 
     // Safely wrap res.json() so callers never crash on HTML error pages
     const safeJson = async () => {
@@ -190,12 +189,12 @@ export const AuthProvider = ({ children }) => {
   // DIRECT BACKEND AUTH FUNCTIONS
   // ─────────────────────────────────────────────
 
-  const login = async (email, password, _twoFACode = '', isAdminLogin = false) => {
+  const login = async (identifier, password, isAdminLogin = false) => {
     try {
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, isAdminLogin })
+        body: JSON.stringify({ identifier, password, isAdminLogin })
       });
       const data = await res.json();
 
@@ -234,12 +233,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const verifyOTP = async (email, otp) => {
+  const verifyOTP = async (email, otp, registrationToken = null) => {
     try {
       const res = await fetch(`${API_BASE}/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }) // OTP is omitted, backend checks isVerified status directly
+        body: JSON.stringify({ email, otp, registrationToken })
       });
       const data = await res.json();
 
@@ -254,6 +253,21 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.error('Verify Error:', err);
       return { success: false, message: err.message || 'Verification failed.' };
+    }
+  };
+
+  const forgotPassword = async (email) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.error('Forgot Password Error:', err);
+      return { success: false, message: err.message || 'Forgot password request failed.' };
     }
   };
 
@@ -318,12 +332,33 @@ export const AuthProvider = ({ children }) => {
     setAccessToken(null);
     localStorage.removeItem('user');
     localStorage.removeItem('refreshToken');
+    window.location.href = '/login';
   };
 
-  const updateLocalUser = (updatedFields) => {
-    const updated = { ...user, ...updatedFields };
-    setUser(updated);
-    localStorage.setItem('user', JSON.stringify(updated));
+  const updateLocalUser = (updates) => {
+    setUser((prev) => {
+      const newUser = { ...prev, ...updates };
+      localStorage.setItem('user', JSON.stringify(newUser));
+      return newUser;
+    });
+  };
+
+  const updateSocialData = (socialLinks = {}, socialMetrics = {}) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const newUser = {
+        ...prev,
+        youtubeLink: socialLinks.youtubeLink !== undefined ? socialLinks.youtubeLink : prev.youtubeLink,
+        instagramLink: socialLinks.instagramLink !== undefined ? socialLinks.instagramLink : prev.instagramLink,
+        facebookLink: socialLinks.facebookLink !== undefined ? socialLinks.facebookLink : prev.facebookLink,
+        socialMetrics: {
+          ...(prev.socialMetrics || {}),
+          ...socialMetrics
+        }
+      };
+      localStorage.setItem('user', JSON.stringify(newUser));
+      return newUser;
+    });
   };
 
   const syncUser = async () => {
@@ -349,6 +384,7 @@ export const AuthProvider = ({ children }) => {
       login,
       register,
       verifyOTP,
+      forgotPassword,
       verifyEmailToken,
       socialLogin,
       socialLoginSuccess,
@@ -356,6 +392,7 @@ export const AuthProvider = ({ children }) => {
       logout,
       authFetch,
       updateLocalUser,
+      updateSocialData,
       syncUser,
       accessToken
     }}>

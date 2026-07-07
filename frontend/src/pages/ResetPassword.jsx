@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { motion } from 'framer-motion';
 import Logo from '../components/Logo';
 import { Mail, CheckCircle } from 'lucide-react';
-import { firebasePasswordReset } from '../firebase.js';
 
 export default function ResetPassword() {
+  const { forgotPassword } = useAuth();
   const { showNotification } = useNotification();
 
   const [email, setEmail] = useState('');
@@ -17,18 +18,16 @@ export default function ResetPassword() {
     e.preventDefault();
     setLoading(true);
     try {
-      await firebasePasswordReset(email);
-      setSent(true);
-      showNotification('Password reset email sent! Check your inbox.', 'success');
+      const data = await forgotPassword(email);
+      if (data.success) {
+        setSent(true);
+        showNotification(data.message || 'Password reset email sent! Check your inbox.', 'success');
+      } else {
+        showNotification(data.message || 'Failed to send reset email.', 'error');
+      }
     } catch (err) {
-      console.error('Reset Password Error:', err.code);
-      const messages = {
-        'auth/user-not-found': 'No account found with this email address.',
-        'auth/invalid-email': 'Please enter a valid email address.',
-        'auth/too-many-requests': 'Too many requests. Please try again later.',
-        'auth/operation-not-allowed': 'Password reset is not enabled. Enable Email/Password in Firebase Console.',
-      };
-      showNotification(messages[err.code] || err.message || 'Failed to send reset email.', 'error');
+      console.error('Reset Password Error:', err);
+      showNotification('An error occurred. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -49,7 +48,7 @@ export default function ResetPassword() {
             Forgot Password?
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 px-4">
-            Enter your account email. Firebase will send you a secure password reset link directly to your inbox.
+            Enter your account email. We will send you a secure password reset link directly to your inbox.
           </p>
         </div>
 

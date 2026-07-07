@@ -2,8 +2,16 @@ import { TeamTask, Message, User } from '../models/db.js';
 
 export const getTeamMembers = async (req, res) => {
   try {
-    // Return all team members in the system
-    const members = await User.find({ role: 'Team Member' });
+    const userId = req.user._id || req.user.id;
+    const role = req.user.role;
+    let query = { role: 'Team Member' };
+    
+    if (role === 'Team Member') {
+      // Team members only see themselves in directory
+      query._id = userId;
+    }
+
+    const members = await User.find(query);
     const cleanMembers = members.map(m => ({
       id: m._id || m.id,
       name: m.name,
@@ -134,21 +142,24 @@ export const getChatMessages = async (req, res) => {
     // If user is a Creator, channel is their own ID.
     // If user is a Team Member, they can fetch messages using a creatorId query parameter.
     const role = req.user.role;
-    let channelId = req.query.creatorId;
+    let channelId = req.query.channelId || req.query.creatorId;
 
     if (role === 'Creator') {
       channelId = req.user._id || req.user.id;
-    }
-
-    if (!channelId) {
-      // Find the first task assigned to this team member to get a creatorId
-      const task = await TeamTask.findOne({ assignedTo: req.user._id || req.user.id });
-      if (task) {
-        channelId = task.creatorId;
+    } else if (role === 'Team Member') {
+      if (channelId) {
+         const hasTask = await TeamTask.findOne({ assignedTo: req.user._id || req.user.id, creatorId: channelId });
+         if (!hasTask) return res.status(403).json({ success: false, message: 'Not authorized to view this chat' });
       } else {
-        // Fallback to general shared room
-        channelId = 'general-team-room';
+         const task = await TeamTask.findOne({ assignedTo: req.user._id || req.user.id });
+         if (task) {
+           channelId = task.creatorId;
+         } else {
+           return res.status(403).json({ success: false, message: 'No chat room available' });
+         }
       }
+    } else if (role !== 'Super Admin' && role !== 'Admin') {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
     const messages = await Message.find({ creatorId: channelId });
@@ -169,6 +180,15 @@ export const postChatMessage = async (req, res) => {
 
     if (!text || !channelId) {
       return res.status(400).json({ success: false, message: 'Text and channel ID are required' });
+    }
+
+    if (req.user.role === 'Team Member') {
+      const hasTask = await TeamTask.findOne({ assignedTo: senderId, creatorId: channelId });
+      if (!hasTask) return res.status(403).json({ success: false, message: 'Not authorized to post in this chat' });
+    } else if (req.user.role === 'Creator' && String(senderId) !== String(channelId)) {
+      return res.status(403).json({ success: false, message: 'Not authorized to post in this chat' });
+    } else if (req.user.role !== 'Super Admin' && req.user.role !== 'Admin' && req.user.role !== 'Creator' && req.user.role !== 'Team Member') {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
     const newMsg = await Message.create({

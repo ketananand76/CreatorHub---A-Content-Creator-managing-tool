@@ -3,69 +3,115 @@ import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { Globe, Youtube, Facebook, Instagram, RefreshCw, BarChart2, TrendingUp, Users, Heart, MessageCircle, Eye } from 'lucide-react';
-import { firebaseSignInWithGoogle, firebaseSignInWithFacebook, getIdToken } from '../firebase.js';
+import { Globe, Youtube, Facebook, Instagram, RefreshCw, BarChart2, TrendingUp, Users, Heart, MessageCircle, Eye, Clock, AlertTriangle, Plus, Trash2 } from 'lucide-react';
+import SocialHandleModal from '../components/SocialHandleModal';
+
+const timeAgo = (dateStr) => {
+  if (!dateStr) return 'Never';
+  const seconds = Math.floor((new Date() - new Date(dateStr)) / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+};
 
 export default function SocialTracker() {
-  const { authFetch, savePendingSocialPlatform } = useAuth();
+  const { authFetch, user, updateSocialData } = useAuth();
   const { showNotification } = useNotification();
 
-  const [accounts, setAccounts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
+  const [syncing, setSyncing] = useState(null); // 'youtube' | 'instagram' | 'facebook' | 'all' | null
   const [activePlatformFilter, setActivePlatformFilter] = useState('all');
+  const [connectModal, setConnectModal] = useState(null); // 'youtube' | 'instagram' | 'facebook' | null
 
-  const fetchSocialAccounts = async () => {
-    try {
-      const res = await authFetch('/social/accounts');
-      const data = await res.json();
-      if (data.success) {
-        setAccounts(data.accounts || []);
-      }
-    } catch (err) {
-      console.error(err);
-      showNotification('Failed to fetch social accounts.', 'error');
-    } finally {
-      setLoading(false);
+
+  // Derive accounts from user global state
+  const accounts = [
+    {
+      platform: 'youtube',
+      connected: !!user?.youtubeLink,
+      username: user?.socialMetrics?.youtube?.channelId || user?.youtubeLink?.split('@').pop() || '',
+      followersCount: user?.socialMetrics?.youtube?.subscribers || 0,
+      totalViews: user?.socialMetrics?.youtube?.views || 0,
+      totalReach: (user?.socialMetrics?.youtube?.subscribers || 0) * 0.8,
+      lastSynced: user?.socialMetrics?.youtube?.lastSynced,
+      engagementRate: '5.2%',
+      dailyGain: Math.floor((user?.socialMetrics?.youtube?.subscribers || 0) * 0.0015)
+    },
+    {
+      platform: 'instagram',
+      connected: !!user?.instagramLink,
+      username: user?.socialMetrics?.instagram?.username || user?.instagramLink?.split('/').pop() || '',
+      followersCount: user?.socialMetrics?.instagram?.followers || 0,
+      totalViews: user?.socialMetrics?.instagram?.posts || 0,
+      totalReach: (user?.socialMetrics?.instagram?.followers || 0) * 0.5,
+      lastSynced: user?.socialMetrics?.instagram?.lastSynced,
+      engagementRate: '7.8%',
+      dailyGain: Math.floor((user?.socialMetrics?.instagram?.followers || 0) * 0.002)
+    },
+    {
+      platform: 'facebook',
+      connected: !!user?.facebookLink,
+      username: user?.socialMetrics?.facebook?.pageId || user?.facebookLink?.split('/').pop() || '',
+      followersCount: user?.socialMetrics?.facebook?.followers || 0,
+      totalViews: user?.socialMetrics?.facebook?.likes || 0,
+      totalReach: (user?.socialMetrics?.facebook?.followers || 0) * 0.7,
+      lastSynced: user?.socialMetrics?.facebook?.lastSynced,
+      engagementRate: '3.4%',
+      dailyGain: Math.floor((user?.socialMetrics?.facebook?.followers || 0) * 0.001)
     }
+  ];
+
+  // Auto-sync logic (15 mins)
+  useEffect(() => {
+    if (syncing) return;
+    const checkAutoSync = () => {
+      accounts.forEach(acc => {
+        if (acc.connected && acc.lastSynced) {
+          const mins = (new Date() - new Date(acc.lastSynced)) / (1000 * 60);
+          if (mins > 15) {
+            handleSync(acc.platform);
+          }
+        }
+      });
+    };
+    const interval = setInterval(checkAutoSync, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [user, syncing]);
+
+
+  const handleConnect = (platform) => {
+    if (platform === 'facebook' || platform === 'instagram') {
+      showNotification(`${platform === 'facebook' ? 'Facebook' : 'Instagram'} live tracking is coming soon! Stay tuned.`, 'info');
+      return;
+    }
+    setConnectModal(platform);
   };
 
-  useEffect(() => {
-    fetchSocialAccounts();
-  }, []);
-
-  // ── Official OAuth connect ──
-  // Clicking Connect redirects to the real Google / Facebook / Instagram
-  // login page. After auth, Firebase redirect result is handled in AuthContext.
-  const handleConnect = async (platform) => {
-    try {
-      savePendingSocialPlatform(platform);
-      if (platform === 'youtube') {
-        const { firebaseSignInWithGoogle } = await import('../firebase.js');
-        await firebaseSignInWithGoogle();
-      } else if (platform === 'facebook') {
-        const { firebaseSignInWithFacebook } = await import('../firebase.js');
-        await firebaseSignInWithFacebook();
-      } else if (platform === 'instagram') {
-        const { startInstagramOAuth } = await import('../firebase.js');
-        startInstagramOAuth();
-      }
-    } catch (err) {
-      console.error('Social Connect Error:', err);
-      showNotification(err.message || 'Failed to start social connection.', 'error');
-    }
+  const handleConnectSuccess = (data) => {
+    setConnectModal(null);
+    showNotification(data.message || 'Account connected!', 'success');
+    updateSocialData(data.socialLinks, {
+      [data.platform || connectModal]: data.metrics
+    });
   };
 
   const handleSync = async (platform) => {
-    setSyncing(true);
+    setSyncing(platform);
+    const link = user[`${platform}Link`];
     try {
-      const res = await authFetch(`/social/sync/${platform}`, {
-        method: 'POST'
+      const res = await authFetch(`/social/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform, link })
       });
       const data = await res.json();
       if (data.success) {
         showNotification(data.message, 'success');
-        setAccounts(prev => prev.map(a => a.platform === platform ? data.account : a));
+        updateSocialData(data.socialLinks, {
+          [platform]: data.metrics
+        });
       } else {
         showNotification(data.message || 'Sync failed', 'error');
       }
@@ -73,7 +119,32 @@ export default function SocialTracker() {
       console.error(err);
       showNotification('Sync connection failed', 'error');
     } finally {
-      setSyncing(false);
+      setSyncing(null);
+    }
+  };
+
+  const handleDisconnect = async (platform) => {
+    if (!window.confirm(`Are you sure you want to disconnect your ${platform} account?`)) return;
+    
+    setSyncing(platform);
+    try {
+      const res = await authFetch(`/social/disconnect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform })
+      });
+      const data = await res.json();
+      if (data.success) {
+        updateSocialData(data.socialLinks, { [platform]: {} });
+        showNotification(data.message, 'success');
+      } else {
+        showNotification(data.message || 'Disconnect failed', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification('Disconnect failed', 'error');
+    } finally {
+      setSyncing(null);
     }
   };
 
@@ -81,26 +152,44 @@ export default function SocialTracker() {
     const connectedPlatforms = accounts.filter(a => a.connected).map(a => a.platform);
     if (connectedPlatforms.length === 0) return;
 
-    setSyncing(true);
+    setSyncing('all');
+    let successCount = 0;
     try {
       for (const platform of connectedPlatforms) {
-        const res = await authFetch(`/social/sync/${platform}`, { method: 'POST' });
+        const link = user[`${platform}Link`];
+        const res = await authFetch(`/social/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform, link })
+        });
         const data = await res.json();
         if (data.success) {
-          setAccounts(prev => prev.map(a => a.platform === platform ? data.account : a));
+          updateSocialData(data.socialLinks, { [platform]: data.metrics });
+          successCount++;
         }
       }
-      showNotification('All active channels synced successfully!', 'success');
+      if (successCount === connectedPlatforms.length) {
+        showNotification('All active channels synced successfully!', 'success');
+      } else {
+        showNotification('Some accounts failed to sync.', 'warning');
+      }
     } catch (err) {
-      showNotification('Failed to sync some accounts.', 'error');
+      showNotification('Failed to sync accounts.', 'error');
     } finally {
-      setSyncing(false);
+      setSyncing(null);
     }
   };
 
   // Aggregate Metrics
-  const totalFollowers = accounts.reduce((acc, a) => acc + (a.connected ? a.followersCount : 0), 0);
-  const totalViews = accounts.reduce((acc, a) => acc + (a.connected ? a.totalViews : 0), 0);
+  const youtubeAcc = accounts.find(a => a.platform === 'youtube');
+  const youtubeConnected = youtubeAcc?.connected;
+  const totalSubscribers = youtubeConnected ? youtubeAcc.followersCount : 0;
+  const totalVideoViews = youtubeConnected ? youtubeAcc.totalViews : 0;
+
+  const totalFollowers = accounts.filter(a => a.platform !== 'youtube').reduce((acc, a) => acc + (a.connected ? a.followersCount : 0), 0);
+  const totalPostViews = accounts.filter(a => a.platform !== 'youtube').reduce((acc, a) => acc + (a.connected ? a.totalViews : 0), 0);
+
+  const totalViews = totalVideoViews + totalPostViews;
   const totalReach = accounts.reduce((acc, a) => acc + (a.connected ? a.totalReach : 0), 0);
 
   // Collect all items across accounts
@@ -157,60 +246,63 @@ export default function SocialTracker() {
         {accounts.some(a => a.connected) && (
           <button
             onClick={handleSyncAll}
-            disabled={syncing}
-            className="px-4 py-2.5 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-brand-500/20"
+            disabled={syncing !== null}
+            className="px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-full font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg shadow-brand-500/20"
           >
-            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${syncing === 'all' ? 'animate-spin' : ''}`} />
             Sync All Data
           </button>
         )}
       </div>
 
-      {loading ? (
-        <div className="text-center py-20">
-          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-brand-500 mx-auto"></div>
-        </div>
-      ) : (
-        <>
           {/* Aggregate Stat Cards */}
           {accounts.some(a => a.connected) && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="glass p-6 rounded-3xl border flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Subscribers / Followers</span>
-                  <h3 className="text-3xl font-black mt-2 font-outfit dark:text-white">{totalFollowers.toLocaleString()}</h3>
-                  <span className="text-[10px] text-emerald-500 flex items-center gap-1 mt-1 font-semibold">
-                    <TrendingUp className="w-3 h-3" /> +1.2% growth today
-                  </span>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="glass p-6 rounded-3xl border flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="p-3 bg-red-500/10 text-red-500 rounded-2xl border border-red-500/20">
+                    <Youtube className="w-5 h-5" />
+                  </div>
                 </div>
-                <div className="p-3.5 bg-brand-500/10 text-brand-500 rounded-2xl border border-brand-500/20">
-                  <Users className="w-6 h-6" />
-                </div>
-              </div>
-
-              <div className="glass p-6 rounded-3xl border flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Video & Post Views</span>
-                  <h3 className="text-3xl font-black mt-2 font-outfit dark:text-white">{totalViews.toLocaleString()}</h3>
-                  <span className="text-[10px] text-emerald-500 flex items-center gap-1 mt-1 font-semibold">
-                    <TrendingUp className="w-3 h-3" /> +2.5% growth today
-                  </span>
-                </div>
-                <div className="p-3.5 bg-cyan-500/10 text-cyan-500 rounded-2xl border border-cyan-500/20">
-                  <Eye className="w-6 h-6" />
+                <div className="mt-4">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Subscribers</span>
+                  <h3 className="text-3xl font-black mt-1 font-outfit dark:text-white">{totalSubscribers.toLocaleString()}</h3>
                 </div>
               </div>
 
-              <div className="glass p-6 rounded-3xl border flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Network Reach</span>
-                  <h3 className="text-3xl font-black mt-2 font-outfit dark:text-white">{totalReach.toLocaleString()}</h3>
-                  <span className="text-[10px] text-emerald-500 flex items-center gap-1 mt-1 font-semibold">
-                    <TrendingUp className="w-3 h-3" /> +3.1% growth today
-                  </span>
+              <div className="glass p-6 rounded-3xl border flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="p-3 bg-red-500/10 text-red-500 rounded-2xl border border-red-500/20">
+                    <Eye className="w-5 h-5" />
+                  </div>
                 </div>
-                <div className="p-3.5 bg-indigo-500/10 text-indigo-500 rounded-2xl border border-indigo-500/20">
-                  <BarChart2 className="w-6 h-6" />
+                <div className="mt-4">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Video Views</span>
+                  <h3 className="text-3xl font-black mt-1 font-outfit dark:text-white">{totalVideoViews.toLocaleString()}</h3>
+                </div>
+              </div>
+
+              <div className="glass p-6 rounded-3xl border flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="p-3 bg-brand-500/10 text-brand-500 rounded-2xl border border-brand-500/20">
+                    <Users className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Followers</span>
+                  <h3 className="text-3xl font-black mt-1 font-outfit dark:text-white">{totalFollowers.toLocaleString()}</h3>
+                </div>
+              </div>
+
+              <div className="glass p-6 rounded-3xl border flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="p-3 bg-cyan-500/10 text-cyan-500 rounded-2xl border border-cyan-500/20">
+                    <Eye className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Post Views</span>
+                  <h3 className="text-3xl font-black mt-1 font-outfit dark:text-white">{totalPostViews.toLocaleString()}</h3>
                 </div>
               </div>
             </div>
@@ -220,7 +312,7 @@ export default function SocialTracker() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {['youtube', 'instagram', 'facebook'].map(plat => {
               const connectedAcc = accounts.find(a => a.platform === plat);
-              const isConnected = !!connectedAcc;
+              const isConnected = connectedAcc?.connected || false;
 
               return (
                 <div key={plat} className="glass p-6 rounded-3xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-6 relative overflow-hidden">
@@ -239,11 +331,14 @@ export default function SocialTracker() {
                       </div>
                     </div>
 
-                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
-                      isConnected ? 'bg-emerald-500/10 text-emerald-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
-                    }`}>
-                      {isConnected ? 'Linked' : 'Offline'}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase flex items-center gap-1 ${
+                        isConnected ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                      }`}>
+                        {isConnected && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                        {isConnected ? `Linked @${connectedAcc.username}` : 'Offline'}
+                      </span>
+                    </div>
                   </div>
 
                   {isConnected ? (
@@ -256,24 +351,43 @@ export default function SocialTracker() {
                           <span className="font-bold text-sm dark:text-white">
                             {connectedAcc.followersCount.toLocaleString()}
                           </span>
+                          <span className="text-[9px] text-emerald-500 font-bold block mt-0.5">
+                            +{connectedAcc.dailyGain} today
+                          </span>
                         </div>
                         <div>
-                          <span className="text-[9px] font-bold text-slate-400 block uppercase">Total Reach</span>
+                          <span className="text-[9px] font-bold text-slate-400 block uppercase">Engagement</span>
                           <span className="font-bold text-sm dark:text-white">
-                            {connectedAcc.totalReach.toLocaleString()}
+                            {connectedAcc.engagementRate}
+                          </span>
+                          <span className="text-[9px] text-brand-500 font-bold block mt-0.5">
+                            High Activity
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleSync(plat)}
-                          disabled={syncing}
-                          className="flex-1 py-2 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-[10px] uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5"
-                        >
-                          <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-                          Sync
-                        </button>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Last synced: {timeAgo(connectedAcc.lastSynced)}
+                        </span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleDisconnect(plat)}
+                            disabled={syncing !== null}
+                            className="p-1.5 bg-rose-100 dark:bg-rose-500/10 hover:bg-rose-200 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-lg transition-colors"
+                            title="Disconnect Account"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleSync(plat)}
+                            disabled={syncing !== null}
+                            className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg font-bold text-[9px] uppercase tracking-wider transition-colors flex items-center gap-1"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${syncing === plat || syncing === 'all' ? 'animate-spin' : ''}`} />
+                            Sync
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -296,6 +410,20 @@ export default function SocialTracker() {
                 </div>
               );
             })}
+
+            {/* Coming Soon: Add Multi-Account */}
+            <div className="glass p-6 rounded-3xl border border-dashed border-slate-300 dark:border-slate-700 flex flex-col items-center justify-center text-center space-y-3 opacity-60 hover:opacity-100 transition-opacity cursor-not-allowed">
+              <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-full">
+                <Plus className="w-6 h-6 text-slate-400" />
+              </div>
+              <div>
+                <h4 className="font-bold text-sm text-slate-800 dark:text-white">Add Another Account</h4>
+                <p className="text-[10px] text-slate-400 mt-1">Multi-account support for agencies is coming soon.</p>
+              </div>
+              <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-brand-500/10 text-brand-500 mt-2">
+                Pro Feature
+              </span>
+            </div>
           </div>
 
           {accounts.some(a => a.connected) && (
@@ -422,8 +550,18 @@ export default function SocialTracker() {
               </p>
             </div>
           )}
-        </>
-      )}
+
+      {/* Connection Modal */}
+      <AnimatePresence>
+        {connectModal && (
+          <SocialHandleModal
+            platform={connectModal}
+            mode="connect"
+            onClose={() => setConnectModal(null)}
+            onSuccess={handleConnectSuccess}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

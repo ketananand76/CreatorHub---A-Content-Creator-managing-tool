@@ -21,6 +21,7 @@ import Support from './pages/Support';
 import SettingsPage from './pages/SettingsPage';
 import SocialTracker from './pages/SocialTracker';
 import VerifyEmail from './pages/VerifyEmail';
+import AuthSuccess from './pages/AuthSuccess';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -117,6 +118,7 @@ export default function App() {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/admin-login" element={<AdminLogin />} />
               <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/auth-success" element={<AuthSuccess />} />
 
               {/* Protected Workspace Layout */}
               <Route

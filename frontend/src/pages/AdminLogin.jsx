@@ -20,14 +20,13 @@ export default function AdminLogin() {
     e.preventDefault();
     setLoading(true);
     try {
-      const data = await login(email, password, '', true);
+      const data = await login(email, password, true);
 
       if (data.success && (data.user?.role === 'Admin' || data.user?.role === 'Super Admin')) {
         showNotification('Welcome back, Admin!', 'success');
         navigate('/admin');
         window.location.href = '/admin';
       } else {
-        logout();
         showNotification(data.message || 'Invalid admin credentials', 'error');
       }
     } catch (err) {

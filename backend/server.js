@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import session from 'express-session';
+import passport from './config/passport.js';
 
 import authRoutes from './routes/authRoutes.js';
 import calendarRoutes from './routes/calendarRoutes.js';
@@ -37,6 +39,18 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Session for OAuth
+app.use(session({
+  secret: process.env.JWT_SECRET || 'creatorhub-secret-key-fallback',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false } // Set to true if using HTTPS
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Rate Limiter
 const limiter = rateLimit({
