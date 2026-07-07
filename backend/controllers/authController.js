@@ -330,15 +330,7 @@ export const login = async (req, res) => {
         return res.status(403).json({ success: false, message: 'Please verify your email before logging in.' });
       }
     }
-      const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}`;
-      sendLinkEmail(user.email, verificationLink, 'verification').catch(console.error);
 
-      return res.status(200).json({
-        success: true,
-        requiresVerification: true,
-        message: 'Account not verified. A new verification link has been sent to your email.'
-      });
-    }
 
     await SessionLog.create({
       userId: user._id || user.id,
