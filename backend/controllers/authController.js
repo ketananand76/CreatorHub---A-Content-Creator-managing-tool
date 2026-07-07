@@ -1,5 +1,22 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+
+// --- Helper: Verify Firebase Token ---
+const verifyFirebaseToken = async (idToken) => {
+  try {
+    const decodedToken = jwt.decode(idToken);
+    if (!decodedToken || !decodedToken.email) {
+      throw new Error('Invalid token payload');
+    }
+    if (decodedToken.exp * 1000 < Date.now()) {
+      throw new Error('Token expired');
+    }
+    return decodedToken;
+  } catch (err) {
+    throw err;
+  }
+};
+
 import { User, SessionLog } from '../models/db.js';
 import nodemailer from 'nodemailer';
 
