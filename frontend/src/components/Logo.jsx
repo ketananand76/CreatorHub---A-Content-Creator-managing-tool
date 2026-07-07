@@ -1,8 +1,8 @@
 import React from 'react';
 
-export default function Logo({ size = 32, showText = false, textClassName = "text-xl font-bold font-outfit text-gradient" }) {
+export default function Logo({ size = 32, showText = false, animated = false, textClassName = "text-xl font-bold font-outfit text-gradient" }) {
   return (
-    <div className="flex items-center gap-2.5 select-none">
+    <div className={`flex items-center gap-2.5 select-none ${animated ? 'animate-pulse' : ''}`}>
       {/* Logo SVG */}
       <svg 
         width={size} 
@@ -10,7 +10,8 @@ export default function Logo({ size = 32, showText = false, textClassName = "tex
         viewBox="0 0 512 512" 
         fill="none" 
         xmlns="http://www.w3.org/2000/svg"
-        className="flex-shrink-0"
+        className={`flex-shrink-0 ${animated ? 'animate-spin' : ''}`}
+        style={animated ? { animationDuration: '3s' } : {}}
       >
         <defs>
           <linearGradient id="logoBrandGrad" x1="0%" y1="0%" x2="100%" y2="100%">

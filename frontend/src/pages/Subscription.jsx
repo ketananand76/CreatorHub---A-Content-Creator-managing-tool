@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import Logo from '../components/Logo';
 import {
   Sparkles,
   Check,
@@ -536,7 +537,7 @@ export default function Subscription() {
             <div className="flex-1 rounded-xl bg-slate-50 dark:bg-slate-900 border dark:border-slate-800/80 p-4 font-mono text-xs leading-relaxed text-slate-700 dark:text-slate-300 overflow-y-auto whitespace-pre-wrap">
               {aiLoading ? (
                 <div className="flex flex-col items-center justify-center h-full gap-3 py-10">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-500"></div>
+                  <div className="flex justify-center items-center my-4"><Logo animated={true} size={32} /></div>
                   <span className="text-slate-400">Gemini LLM model processing query...</span>
                 </div>
               ) : aiOutput ? (

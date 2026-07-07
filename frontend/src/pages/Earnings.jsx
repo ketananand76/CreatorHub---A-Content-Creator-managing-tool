@@ -15,6 +15,7 @@ import {
   X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import Logo from '../components/Logo';
 
 export default function Earnings() {
   const { authFetch, user } = useAuth();
@@ -212,7 +213,7 @@ export default function Earnings() {
             <h3 className="font-bold text-slate-800 dark:text-white mb-4">Billing Statement Log</h3>
             {loading ? (
               <div className="text-center py-10">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-500 mx-auto"></div>
+                <div className="flex justify-center items-center my-4"><Logo animated={true} size={32} /></div>
               </div>
             ) : logs.length === 0 ? (
               <div className="text-center py-10 text-xs text-slate-400">

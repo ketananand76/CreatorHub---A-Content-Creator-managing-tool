@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import Logo from '../components/Logo';
 import {
   Plus,
   Trash2,
@@ -204,7 +205,7 @@ export default function BrandCRM() {
       {/* Kanban Board Container */}
       {loading ? (
         <div className="text-center py-20">
-          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-brand-500 mx-auto"></div>
+          <div className="flex justify-center items-center my-4"><Logo animated={true} size={40} /></div>
         </div>
       ) : (
         <div className="flex gap-4 overflow-x-auto pb-4 select-none">

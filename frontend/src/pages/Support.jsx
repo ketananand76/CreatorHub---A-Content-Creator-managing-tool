@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LifeBuoy, Send, MessageSquare, AlertCircle, Clock, CheckCircle } from 'lucide-react';
+import Logo from '../components/Logo';
 
 export default function Support() {
   const { authFetch } = useAuth();
@@ -119,7 +120,7 @@ export default function Support() {
 
           {loading ? (
             <div className="text-center py-10">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-500 mx-auto"></div>
+              <div className="flex justify-center items-center my-4"><Logo animated={true} size={32} /></div>
             </div>
           ) : tickets.length === 0 ? (
             <div className="text-center py-16 text-xs text-slate-400">

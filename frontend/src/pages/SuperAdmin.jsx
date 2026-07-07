@@ -1,3 +1,4 @@
+import Logo from '../components/Logo';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
@@ -411,7 +412,7 @@ export default function SuperAdmin() {
 
       {loading ? (
         <div className="text-center py-20">
-          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-brand-500 mx-auto"></div>
+          <div className="flex justify-center items-center my-4"><Logo animated={true} size={40} /></div>
         </div>
       ) : (
         <>
@@ -546,7 +547,7 @@ export default function SuperAdmin() {
                   <div className="border-t dark:border-slate-800 pt-4">
                     {analyzing ? (
                       <div className="py-12 flex flex-col items-center justify-center space-y-3">
-                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+                        <div className="flex justify-center items-center my-4"><Logo animated={true} size={32} /></div>
                         <span className="text-xs text-slate-400 animate-pulse">Running AI Audit...</span>
                       </div>
                     ) : aiAnalysis ? (

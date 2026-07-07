@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Loader2 } from 'lucide-react';
+import Logo from '../components/Logo';
 
 export default function AuthSuccess() {
   const [searchParams] = useSearchParams();
@@ -23,8 +24,8 @@ export default function AuthSuccess() {
 
   return (
     <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4 text-white">
-        <Loader2 className="w-12 h-12 animate-spin text-purple-500" />
+      <div className="flex flex-col items-center gap-4">
+        <div className="flex justify-center items-center my-4"><Logo animated={true} size={48} /></div>
         <h2 className="text-xl font-outfit font-bold">Completing authentication...</h2>
       </div>
     </div>
