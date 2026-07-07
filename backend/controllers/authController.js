@@ -121,28 +121,13 @@ const sendLinkEmail = async (email, link, type = 'verification') => {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; }
-    .container { max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
-    .content { padding: 40px 30px; text-align: center; }
-    .title { font-size: 22px; font-weight: 800; color: #1e293b; margin-bottom: 15px; }
-    .text { font-size: 15px; color: #475569; line-height: 1.6; margin-bottom: 25px; }
-    .btn { display: inline-block; background: #4f46e5; color: #ffffff !important; padding: 14px 32px; border-radius: 10px; font-weight: 700; text-decoration: none; font-size: 15px; box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3); }
-  </style>
 </head>
-<body>
-  <div class="container">
-    ${getBrandHeader()}
-    <div class="content">
-      <div class="title">${isReset ? 'Password Reset Request' : 'Verify Your Email'}</div>
-      <div class="text">
-        ${isReset ? 'We received a request to reset your CreatorHub password. Click the button below to choose a new one.' : 'Please click the button below to verify your email address.'}
-      </div>
-      <a href="${link}" class="btn">${isReset ? 'Reset Password' : 'Verify Email'}</a>
-      <div class="text" style="font-size: 12px; margin-top: 25px;">If you didn't request this, you can safely ignore this email.</div>
-    </div>
-    ${getBrandFooter()}
-  </div>
+<body style="font-family: sans-serif; padding: 20px;">
+  <h2>${isReset ? 'Password Reset Request' : 'Verify Your Email'}</h2>
+  <p>${isReset ? 'We received a request to reset your CreatorHub password.' : 'Welcome to CreatorHub! Please verify your email address.'}</p>
+  <p>Click the link below:</p>
+  <p><a href="${link}">${link}</a></p>
+  <p style="margin-top: 20px; font-size: 12px; color: gray;">If you didn't request this, you can safely ignore this email.</p>
 </body>
 </html>
 `;
