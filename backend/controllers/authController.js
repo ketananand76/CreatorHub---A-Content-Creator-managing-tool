@@ -335,13 +335,12 @@ export const firebaseSync = async (req, res) => {
     } else if (!user.isVerified) {
       // Mark as verified if they weren't
       user.isVerified = true;
-      await user.save();
+      await User.findByIdAndUpdate(user._id || user.id, { isVerified: true });
     }
 
     // Generate our JWT
     const { accessToken, refreshToken } = generateTokens(user._id || user.id);
-    user.refreshToken = refreshToken;
-    await user.save();
+
 
     await SessionLog.create({
       userId: user._id || user.id,
