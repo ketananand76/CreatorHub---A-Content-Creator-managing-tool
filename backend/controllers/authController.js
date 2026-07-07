@@ -328,6 +328,7 @@ export const firebaseSync = async (req, res) => {
       user = await User.create({
         name: name || decodedToken.name || email.split('@')[0],
         email,
+        password: 'firebase_managed_auth_' + Date.now(), // Dummy password since Firebase handles it
         role: role || 'Creator',
         isVerified: true
       });
