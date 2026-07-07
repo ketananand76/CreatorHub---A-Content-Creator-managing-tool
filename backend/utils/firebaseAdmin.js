@@ -1,4 +1,5 @@
-import admin from 'firebase-admin';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -12,18 +13,27 @@ export const initFirebaseAdmin = () => {
   if (isInitialized) return;
 
   try {
-    // Try to load the service account JSON file
-    const serviceAccountPath = path.join(__dirname, '..', 'doceditor-4c664-firebase-adminsdk-fbsvc-6191fb70c7.json');
-    if (fs.existsSync(serviceAccountPath)) {
-      const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-      
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
+    let serviceAccount;
+    
+    // First try to load from environment variable (for Render/production)
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+      serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } else {
+      // Fallback to local file
+      const serviceAccountPath = path.join(__dirname, '..', 'doceditor-4c664-firebase-adminsdk-fbsvc-6191fb70c7.json');
+      if (fs.existsSync(serviceAccountPath)) {
+        serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+      }
+    }
+
+    if (serviceAccount) {
+      initializeApp({
+        credential: cert(serviceAccount)
       });
       isInitialized = true;
       console.log('Firebase Admin SDK initialized successfully.');
     } else {
-      console.warn('Firebase Service Account JSON not found. Admin SDK will not be initialized.');
+      console.warn('Firebase Service Account JSON/ENV not found. Admin SDK will not be initialized.');
     }
   } catch (error) {
     console.error('Error initializing Firebase Admin:', error);
@@ -37,8 +47,8 @@ export const deleteUserFromFirebase = async (email) => {
   }
   
   try {
-    const userRecord = await admin.auth().getUserByEmail(email);
-    await admin.auth().deleteUser(userRecord.uid);
+    const userRecord = await getAuth().getUserByEmail(email);
+    await getAuth().deleteUser(userRecord.uid);
     console.log(`Successfully deleted user with email ${email} from Firebase Auth.`);
     return true;
   } catch (error) {
