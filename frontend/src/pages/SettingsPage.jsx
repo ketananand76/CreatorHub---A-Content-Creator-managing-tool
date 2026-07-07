@@ -117,7 +117,7 @@ export default function SettingsPage() {
       const data = await res.json();
       if (data.success) {
         showNotification(data.message, 'success');
-        updateLocalUser({ name }); // Sync name in local states
+        updateLocalUser({ name, profilePicture }); // Sync name and DP in local states
       } else {
         showNotification(data.message || 'Failed to update profile', 'error');
       }
