@@ -18,6 +18,7 @@ import Subscription from './pages/Subscription';
 import SuperAdmin from './pages/SuperAdmin';
 import Support from './pages/Support';
 import SettingsPage from './pages/SettingsPage';
+import CookieConsent from './components/CookieConsent';
 import SocialTracker from './pages/SocialTracker';
 import AuthSuccess from './pages/AuthSuccess';
 
@@ -95,6 +96,7 @@ const AppLayout = () => {
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          <CookieConsent />
         </main>
       </div>
     </div>
