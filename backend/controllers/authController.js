@@ -808,6 +808,7 @@ export const updateProfile = async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(userId, {
       name,
       bio,
+      profilePicture,
       niche,
       youtubeSubscribers: Number(youtubeSubscribers) || 0,
       instagramFollowers: Number(instagramFollowers) || 0,
