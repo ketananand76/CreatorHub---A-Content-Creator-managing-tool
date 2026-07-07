@@ -216,13 +216,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (name, email, password, role = 'Creator', referredBy = '') => {
     try {
-      // 1. Create in Firebase for password reset functionality
-      const credential = await firebaseCreateWithEmail(email, password);
-      if (name) {
-        await firebaseUpdateProfile(credential.user, { displayName: name });
-      }
-
-      // 2. Register native user in backend
+      // 1. Register native user in backend FIRST
       const res = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -234,13 +228,20 @@ export const AuthProvider = ({ children }) => {
         return { success: false, message: data.message || 'Backend registration failed' };
       }
 
+      // 2. Try to create in Firebase for password reset functionality
+      try {
+        const credential = await firebaseCreateWithEmail(email, password);
+        if (name) {
+          await firebaseUpdateProfile(credential.user, { displayName: name });
+        }
+      } catch (fbErr) {
+        console.warn('Firebase registration warning (can be ignored if user already exists in Firebase):', fbErr.message);
+      }
+
       return { success: true, message: 'Registration successful! Verification email sent.' };
     } catch (err) {
       console.error('Register Error:', err);
-      let msg = 'Registration failed. Please try again.';
-      if (err.code === 'auth/email-already-in-use') msg = 'Email is already registered.';
-      if (err.code === 'auth/weak-password') msg = 'Password is too weak. Please use at least 6 characters.';
-      return { success: false, message: msg };
+      return { success: false, message: 'Registration failed. Please try again.' };
     }
   };
 
