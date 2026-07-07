@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { firebaseCreateWithEmail, firebaseSignInWithEmail, firebasePasswordReset, getIdToken } from '../firebase';
+import { firebaseCreateWithEmail, firebaseSignInWithEmail, firebasePasswordReset, getIdToken, firebaseUpdateProfile } from '../firebase';
 
 const AuthContext = createContext();
 
@@ -245,6 +245,12 @@ export const AuthProvider = ({ children }) => {
   const register = async (name, email, password, role = 'Creator') => {
     try {
       const credential = await firebaseCreateWithEmail(email, password);
+      
+      // Update Firebase Profile with the provided name
+      if (name) {
+        await firebaseUpdateProfile(credential.user, { displayName: name });
+      }
+
       // Backend sync not strictly required here if they must verify email first,
       // but we can just tell them it's sent.
       return { success: true, message: 'Verification email sent. Please check your inbox and verify your email before logging in.' };

@@ -9,7 +9,8 @@ import {
   FacebookAuthProvider,
   sendEmailVerification,
   sendPasswordResetEmail,
-  signOut
+  signOut,
+  updateProfile
 } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -108,3 +109,5 @@ export const firebasePasswordReset = (email) =>
 export const firebaseSignOut = () => signOut(auth);
 
 export const getIdToken = (firebaseUser) => firebaseUser.getIdToken(true);
+
+export const firebaseUpdateProfile = (firebaseUser, profile) => updateProfile(firebaseUser, profile);
