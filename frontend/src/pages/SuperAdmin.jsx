@@ -824,16 +824,7 @@ export default function SuperAdmin() {
                           </button>
                         </td>
                         <td className="py-3">
-                          <select
-                            value={u.role}
-                            onChange={(e) => handleUpdateUserRole(u.id, e.target.value)}
-                            className="px-2 py-1 bg-white dark:bg-slate-900 border dark:border-slate-800/80 rounded-lg text-slate-700 dark:text-slate-300 font-bold focus:outline-none focus:ring-1 focus:ring-brand-500 text-[10px]"
-                          >
-                            <option value="Creator">Creator</option>
-                            <option value="Team Member">Team Member</option>
-                            
-                            
-                          </select>
+                          <span className="font-bold text-slate-700 dark:text-slate-300">{u.role}</span>
                         </td>
                         <td className="py-3">
                           <span className={`px-2 py-0.5 rounded font-bold uppercase text-[9px] ${
@@ -916,16 +907,7 @@ export default function SuperAdmin() {
                           </span>
                         </td>
                         <td className="py-3">
-                          <select
-                            value={u.role}
-                            onChange={(e) => handleUpdateUserRole(u.id, e.target.value)}
-                            className="px-2 py-1 bg-white dark:bg-slate-900 border dark:border-slate-800/80 rounded-lg text-slate-700 dark:text-slate-300 font-bold focus:outline-none focus:ring-1 focus:ring-brand-500 text-[10px]"
-                          >
-                            
-                            
-                            <option value="Creator">Creator</option>
-                            <option value="Team Member">Team Member</option>
-                          </select>
+                          <span className="font-bold text-slate-700 dark:text-slate-300">{u.role}</span>
                         </td>
                         <td className="py-3 text-right space-x-2 whitespace-nowrap">
                           {u.status === 'active' ? (
@@ -1298,14 +1280,7 @@ export default function SuperAdmin() {
                     <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Email</label>
                     <input type="email" value={editFormData.email || ''} onChange={e => setEditFormData({...editFormData, email: e.target.value})} className="w-full px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-brand-500 outline-none dark:border-slate-800 dark:text-white" />
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Role</label>
-                    <select value={editFormData.role || 'Creator'} onChange={e => setEditFormData({...editFormData, role: e.target.value})} className="w-full px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-brand-500 outline-none dark:border-slate-800 dark:text-white">
-                      <option value="Creator">Creator</option>
-                      
-                      
-                    </select>
-                  </div>
+
                   <div>
                     <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Status</label>
                     <select value={editFormData.status || 'active'} onChange={e => setEditFormData({...editFormData, status: e.target.value})} className="w-full px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-brand-500 outline-none dark:border-slate-800 dark:text-white">
