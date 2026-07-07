@@ -143,10 +143,12 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {/* Ad Carousel */}
-      <motion.div variants={itemVariants}>
-        <AdCarousel />
-      </motion.div>
+      {/* Ad Carousel (Only for free users) */}
+      {!user?.isPremium && (
+        <motion.div variants={itemVariants}>
+          <AdCarousel />
+        </motion.div>
+      )}
 
       {/* Stats Grid */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -322,9 +324,12 @@ export default function Dashboard() {
         </motion.div>
       </div>
 
-      <motion.div variants={itemVariants}>
-        <AdSenseBanner type="banner" />
-      </motion.div>
+      {/* Banner Ad (Only for free users) */}
+      {!user?.isPremium && (
+        <motion.div variants={itemVariants}>
+          <AdSenseBanner type="banner" />
+        </motion.div>
+      )}
     </motion.div>
   );
 }

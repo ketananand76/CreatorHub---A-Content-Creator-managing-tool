@@ -166,7 +166,8 @@ export default function Sidebar({ mobileSidebarOpen, setMobileSidebarOpen }) {
             )}
           </button>
 
-          {(!collapsed || isMobile) && <AdSenseBanner type="sidebar" />}
+          {/* Ads only for free users */}
+          {(!collapsed || isMobile) && !user?.isPremium && <AdSenseBanner type="sidebar" />}
 
           {/* User Card */}
           <div className="flex items-center justify-between">
