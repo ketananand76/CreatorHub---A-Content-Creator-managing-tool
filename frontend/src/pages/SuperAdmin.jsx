@@ -162,14 +162,7 @@ export default function SuperAdmin() {
       const lbData = await lbRes.json();
       if (lbData.success) setLeaderboard(lbData.leaderboard || []);
 
-      // Creator Metrics
-      try {
-        const cmRes = await authFetch('/social/admin/metrics');
-        const cmData = await cmRes.json();
-        if (cmData.success) setCreatorMetrics(cmData.metrics || []);
-      } catch (cmErr) {
-        console.error('Error fetching creator metrics:', cmErr);
-      }
+
     } catch (e) {
       console.error(e);
       showNotification('Admin reports failed to load', 'error');
