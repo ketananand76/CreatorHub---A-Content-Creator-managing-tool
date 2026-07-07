@@ -394,7 +394,8 @@ export default function SuperAdmin() {
           { id: 'payments', label: 'Payment Logs Queue', icon: DollarSign },
           { id: 'tickets', label: 'Support Queue', icon: LifeBuoy },
           { id: 'sessions', label: 'Security Logs', icon: History },
-          { id: 'adsense', label: 'Google AdSense', icon: Globe }
+          { id: 'adsense', label: 'Google AdSense', icon: Globe },
+          { id: 'referrals', label: 'Referral Folders', icon: FolderTree }
         ].map(t => (
           <button
             key={t.id}
