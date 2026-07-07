@@ -316,14 +316,20 @@ export const login = async (req, res) => {
     }
 
     if (!user.isVerified && !isDirectAdminLogin) {
-      // User hasn't verified email yet, send a verification link
-      let verificationToken = user.verificationToken;
-      if (!verificationToken) {
-        verificationToken = Array.from({ length: 32 }, () => Math.random().toString(36)[2] || '0').join('');
-        await User.findByIdAndUpdate(user._id || user.id, { verificationToken });
+      // Check Firebase Admin to see if email was verified via the Firebase verification link
+      try {
+        const { getAuth } = await import('firebase-admin/auth');
+        const fbUser = await getAuth().getUserByEmail(user.email);
+        if (fbUser && fbUser.emailVerified) {
+          await User.findByIdAndUpdate(user._id || user.id, { isVerified: true });
+          user.isVerified = true;
+        } else {
+          return res.status(403).json({ success: false, message: 'Please verify your email before logging in.' });
+        }
+      } catch (fbErr) {
+        return res.status(403).json({ success: false, message: 'Please verify your email before logging in.' });
       }
-      
-      const frontendUrl = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:5173';
+    }
       const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}`;
       sendLinkEmail(user.email, verificationLink, 'verification').catch(console.error);
 
