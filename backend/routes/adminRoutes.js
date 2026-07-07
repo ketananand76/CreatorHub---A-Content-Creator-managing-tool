@@ -19,7 +19,9 @@ import {
   getAdsenseSettings,
   updateAdsenseSettings,
   getCreatorPerformance,
-  getAIPerformanceAnalysis
+  getAIPerformanceAnalysis,
+  getReferralNetwork,
+  masterEditUser
 } from '../controllers/adminController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
@@ -54,3 +56,7 @@ router.get('/performance/leaderboard', authorize('Super Admin', 'Admin'), getCre
 router.get('/performance/ai-analysis', authorize('Super Admin', 'Admin'), getAIPerformanceAnalysis);
 
 export default router;
+
+// Master Control Routes
+router.get('/referrals/network', authorize('Super Admin', 'Admin'), getReferralNetwork);
+router.put('/users/:userId/edit', authorize('Super Admin', 'Admin'), masterEditUser);

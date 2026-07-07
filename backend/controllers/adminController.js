@@ -554,3 +554,63 @@ The CreatorHub workspace ecosystem shows highly positive engagement metrics. Bra
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+// --- New God Mode Controls ---
+export const getReferralNetwork = async (req, res) => {
+  try {
+    const allUsers = await User.find({}).lean();
+    
+    // Group users by the person who referred them
+    const network = {};
+    const usersMap = {};
+
+    allUsers.forEach(u => {
+      usersMap[u.referralCode] = { id: u._id, name: u.name, email: u.email, referralCount: u.referralCount };
+    });
+
+    allUsers.forEach(u => {
+      if (u.referredBy) {
+        if (!network[u.referredBy]) {
+          network[u.referredBy] = {
+            referrer: usersMap[u.referredBy] || { name: 'Unknown', email: 'N/A' },
+            referredUsers: []
+          };
+        }
+        network[u.referredBy].referredUsers.push({
+          id: u._id,
+          name: u.name,
+          email: u.email,
+          createdAt: u.createdAt
+        });
+      }
+    });
+
+    res.status(200).json({ success: true, network: Object.values(network) });
+  } catch (error) {
+    console.error('Error fetching referral network:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching referral network' });
+  }
+};
+
+export const masterEditUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const updateData = req.body;
+    
+    // Allow editing almost everything except password explicitly if they don't want to
+    // But since admin is god, whatever comes in body is updated.
+    
+    // Ensure numeric parsing for certain fields just in case
+    if (updateData.referralCount !== undefined) updateData.referralCount = Number(updateData.referralCount);
+    
+    const updatedUser = await User.findByIdAndUpdate(userId, updateData, { new: true }).lean();
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    res.status(200).json({ success: true, message: 'User details updated successfully!', user: updatedUser });
+  } catch (error) {
+    console.error('Error in master edit user:', error);
+    res.status(500).json({ success: false, message: 'Server error while editing user' });
+  }
+};

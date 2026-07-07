@@ -24,7 +24,11 @@ export default function SuperAdmin() {
   const { authFetch } = useAuth();
   const { showNotification } = useNotification();
 
-  const [activeTab, setActiveTab] = useState('overview'); // overview, leaderboard, users, admins, broadcast, payments, tickets, sessions, adsense
+  const [activeTab, setActiveTab] = useState('overview');
+  const [referralNetwork, setReferralNetwork] = useState([]);
+  const [expandedFolders, setExpandedFolders] = useState({});
+  const [editingUser, setEditingUser] = useState(null);
+  const [editFormData, setEditFormData] = useState({}); // overview, leaderboard, users, admins, broadcast, payments, tickets, sessions, adsense
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -265,6 +269,26 @@ export default function SuperAdmin() {
       }
     } catch (e) {
       showNotification('Rejection failed', 'error');
+    }
+  };
+
+  const handleMasterEdit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await authFetch(`/admin/users/${editingUser._id || editingUser.id}/edit`, {
+        method: 'PUT',
+        body: JSON.stringify(editFormData)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showNotification('User Master Updated', 'success');
+        setUsers(users.map(u => (u._id === (editingUser._id || editingUser.id) ? data.user : u)));
+        setEditingUser(null);
+      } else {
+        showNotification(data.message, 'error');
+      }
+    } catch (err) {
+      showNotification('Failed to master edit user', 'error');
     }
   };
 
@@ -1098,6 +1122,67 @@ export default function SuperAdmin() {
             </div>
           )}
 
+                    {/* --- TAB: REFERRALS --- */}
+          {activeTab === 'referrals' && (
+            <div className="glass p-6 rounded-2xl border space-y-4">
+              <div className="flex items-center gap-2 mb-4 border-b dark:border-slate-800 pb-4">
+                <FolderTree className="w-5 h-5 text-brand-500" />
+                <h3 className="font-bold text-lg text-slate-800 dark:text-white">Referral Network Monitor</h3>
+              </div>
+
+              {referralNetwork.length === 0 ? (
+                <div className="text-center py-10 text-slate-500">No referral data found.</div>
+              ) : (
+                <div className="space-y-4">
+                  {referralNetwork.map((net, idx) => (
+                    <div key={idx} className="border dark:border-slate-800 rounded-xl overflow-hidden bg-white/50 dark:bg-slate-900/50">
+                      <button 
+                        onClick={() => setExpandedFolders({ ...expandedFolders, [idx]: !expandedFolders[idx] })}
+                        className="w-full flex items-center justify-between p-4 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <FolderTree className="w-5 h-5 text-yellow-500" />
+                          <div className="text-left">
+                            <h4 className="font-bold text-sm text-slate-800 dark:text-white">{net.referrer.name}</h4>
+                            <p className="text-xs text-slate-500">{net.referrer.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-bold px-2 py-1 bg-brand-500/10 text-brand-600 rounded-lg">
+                            {net.referredUsers.length} Referrals
+                          </span>
+                        </div>
+                      </button>
+                      
+                      {expandedFolders[idx] && (
+                        <div className="border-t dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-950/50">
+                          <table className="w-full text-left text-xs">
+                            <thead>
+                              <tr className="text-slate-400 font-bold uppercase border-b dark:border-slate-800">
+                                <th className="pb-2">User Name</th>
+                                <th className="pb-2">Email</th>
+                                <th className="pb-2 text-right">Joined On</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {net.referredUsers.map((ru, i) => (
+                                <tr key={i} className="border-b dark:border-slate-800 last:border-0">
+                                  <td className="py-2 font-semibold text-slate-700 dark:text-slate-300">{ru.name}</td>
+                                  <td className="py-2 text-slate-500">{ru.email}</td>
+                                  <td className="py-2 text-right text-slate-500">{new Date(ru.createdAt).toLocaleDateString()}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* --- TAB: SESSIONS --- */}
           {activeTab === 'sessions' && (
             <div className="glass p-6 rounded-2xl border space-y-4">
@@ -1174,6 +1259,79 @@ export default function SuperAdmin() {
           )}
         </>
       )}
+
+      {/* --- MASTER EDIT USER MODAL --- */}
+      <AnimatePresence>
+        {editingUser && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-dark-card border dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-xl relative max-h-[90vh] overflow-y-auto"
+            >
+              <button
+                onClick={() => setEditingUser(null)}
+                className="absolute top-4 right-4 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <h3 className="text-xl font-bold font-outfit text-slate-800 dark:text-white border-b dark:border-slate-800 pb-3 flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-brand-500" />
+                Master Edit User
+              </h3>
+
+              <form onSubmit={handleMasterEdit} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Name</label>
+                    <input type="text" value={editFormData.name || ''} onChange={e => setEditFormData({...editFormData, name: e.target.value})} className="w-full px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-brand-500 outline-none dark:border-slate-800 dark:text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Email</label>
+                    <input type="email" value={editFormData.email || ''} onChange={e => setEditFormData({...editFormData, email: e.target.value})} className="w-full px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-brand-500 outline-none dark:border-slate-800 dark:text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Role</label>
+                    <select value={editFormData.role || 'Creator'} onChange={e => setEditFormData({...editFormData, role: e.target.value})} className="w-full px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-brand-500 outline-none dark:border-slate-800 dark:text-white">
+                      <option value="Creator">Creator</option>
+                      <option value="Admin">Admin</option>
+                      <option value="Super Admin">Super Admin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Status</label>
+                    <select value={editFormData.status || 'active'} onChange={e => setEditFormData({...editFormData, status: e.target.value})} className="w-full px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-brand-500 outline-none dark:border-slate-800 dark:text-white">
+                      <option value="active">Active</option>
+                      <option value="suspended">Suspended</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Premium Status</label>
+                    <select value={editFormData.isPremium ? 'true' : 'false'} onChange={e => setEditFormData({...editFormData, isPremium: e.target.value === 'true'})} className="w-full px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-brand-500 outline-none dark:border-slate-800 dark:text-white">
+                      <option value="true">Premium</option>
+                      <option value="false">Free</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Referral Count</label>
+                    <input type="number" value={editFormData.referralCount || 0} onChange={e => setEditFormData({...editFormData, referralCount: e.target.value})} className="w-full px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-brand-500 outline-none dark:border-slate-800 dark:text-white" />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-md shadow-brand-500/10 mt-6"
+                >
+                  <Save className="w-4 h-4" />
+                  Save Changes
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* --- REPLY TICKET MODAL --- */}
       <AnimatePresence>
