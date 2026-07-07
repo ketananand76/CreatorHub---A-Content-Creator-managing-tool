@@ -14,6 +14,7 @@ export default function SettingsPage() {
 
   // Form states
   const [name, setName] = useState(user?.name || '');
+  const [profilePicture, setProfilePicture] = useState('');
   const [bio, setBio] = useState('');
   const [niche, setNiche] = useState('');
   const [youtubeSubscribers, setYoutubeSubscribers] = useState(0);
@@ -55,6 +56,7 @@ export default function SettingsPage() {
         if (data.success && data.profile) {
           const p = data.profile;
           setName(p.name || '');
+          setProfilePicture(p.profilePicture || '');
           setBio(p.bio || '');
           setNiche(p.niche || '');
           setYoutubeSubscribers(p.youtubeSubscribers || 0);
@@ -83,6 +85,7 @@ export default function SettingsPage() {
         method: 'PUT',
         body: JSON.stringify({
           name,
+          profilePicture,
           bio,
           niche,
           youtubeSubscribers,
@@ -191,6 +194,28 @@ export default function SettingsPage() {
                 value={user?.email || ''}
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs outline-none text-slate-500 cursor-not-allowed"
               />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                Profile Picture URL
+              </label>
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-brand-500/20 shrink-0">
+                  {profilePicture ? (
+                    <img src={profilePicture} alt="DP" className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-5 h-5 text-slate-400" />
+                  )}
+                </div>
+                <input
+                  type="url"
+                  value={profilePicture}
+                  onChange={(e) => setProfilePicture(e.target.value)}
+                  placeholder="https://example.com/my-photo.jpg"
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:ring-2 focus:ring-brand-500 outline-none text-slate-800 dark:text-white"
+                />
+              </div>
             </div>
 
             <div>
@@ -323,6 +348,7 @@ export default function SettingsPage() {
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:ring-2 focus:ring-brand-500 outline-none text-slate-800 dark:text-white"
                 />
               </div>
+
 
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">

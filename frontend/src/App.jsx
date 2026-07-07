@@ -21,6 +21,7 @@ import SettingsPage from './pages/SettingsPage';
 import CookieConsent from './components/CookieConsent';
 import SocialTracker from './pages/SocialTracker';
 import AuthSuccess from './pages/AuthSuccess';
+import Referrals from './pages/Referrals';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -85,6 +86,7 @@ const AppLayout = () => {
             <Route path="/subscription" element={<Subscription />} />
             <Route path="/support" element={<Support />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/referrals" element={<Referrals />} />
             <Route path="/tracker" element={<SocialTracker />} />
             <Route
               path="/admin"

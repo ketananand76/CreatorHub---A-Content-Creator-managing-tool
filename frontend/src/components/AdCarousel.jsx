@@ -4,6 +4,17 @@ import { ChevronLeft, ChevronRight, Zap, Target, Crown, Gift } from 'lucide-reac
 
 const ads = [
   {
+    id: 5,
+    title: 'FREE PREMIUM!',
+    subtitle: 'Refer 10 Friends & Get 1 Day Pro',
+    hindiSubtitle: '10 दोस्तों को रेफर करें और 1 दिन का प्रीमियम पाएं!',
+    bgGradient: 'from-fuchsia-600 to-rose-600',
+    icon: <Gift className="w-12 h-12 text-white/90 group-hover:scale-110 transition-transform duration-300" />,
+    ctaText: 'Get My Link',
+    ctaLink: '/referrals',
+    isPro: true,
+  },
+  {
     id: 1,
     title: 'Unlock Creator Pro',
     subtitle: 'Get access to premium analytics, exclusive brand deals, and 24/7 priority support.',

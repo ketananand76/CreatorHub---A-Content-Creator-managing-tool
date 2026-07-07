@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { motion } from 'framer-motion';
 import Logo from '../components/Logo';
-import { Mail, Lock, User, UserCheck, Shield, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, UserCheck, Shield, Eye, EyeOff, Gift } from 'lucide-react';
 
 export default function Register() {
   const { register } = useAuth();
   const { showNotification } = useNotification();
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'Creator' });
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const refCode = searchParams.get('ref') || '';
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'Creator', referredBy: refCode });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);

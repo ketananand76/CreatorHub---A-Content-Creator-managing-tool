@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Sparkles, HelpCircle, Bell, ArrowUpRight, Menu, Check, ShieldAlert, Info } from 'lucide-react';
+import { Sparkles, HelpCircle, Bell, ArrowUpRight, Menu, Check, ShieldAlert, Info, Gift, User as UserIcon } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useNotification as useAppNotification } from '../context/NotificationContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -117,6 +117,17 @@ export default function TopHeader({ setMobileSidebarOpen }) {
           <HelpCircle className="w-5 h-5" />
         </button>
 
+        {/* Referral/Gift Link */}
+        <button
+          onClick={() => navigate('/referrals')}
+          className="p-2 rounded-lg text-brand-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-500/10 transition-all relative"
+          title="Refer & Earn Premium"
+        >
+          <Gift className="w-5 h-5" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full animate-ping"></span>
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full"></span>
+        </button>
+
         {/* Alerts Bell and Dropdown */}
         <div className="relative" ref={dropdownRef}>
           <button
@@ -229,6 +240,19 @@ export default function TopHeader({ setMobileSidebarOpen }) {
         <span className="hidden md:inline-block text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
           {user.role} Account
         </span>
+
+        {/* Profile Avatar */}
+        <div 
+          onClick={() => navigate('/settings')}
+          className="w-8 h-8 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 border-2 border-brand-500/20 cursor-pointer hover:border-brand-500 transition-colors flex items-center justify-center shrink-0 ml-1"
+          title="Profile Settings"
+        >
+          {user.profilePicture ? (
+            <img src={user.profilePicture} alt="DP" className="w-full h-full object-cover" />
+          ) : (
+            <UserIcon className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+          )}
+        </div>
       </div>
     </header>
   );

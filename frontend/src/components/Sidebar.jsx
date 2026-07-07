@@ -171,8 +171,14 @@ export default function Sidebar({ mobileSidebarOpen, setMobileSidebarOpen }) {
           {/* User Card */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 overflow-hidden">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center text-white font-semibold text-base shadow-md uppercase flex-shrink-0">
-                {user.name.charAt(0)}
+              <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-semibold text-base shadow-md uppercase flex-shrink-0 overflow-hidden border-2 border-brand-500/20">
+                {user.profilePicture ? (
+                  <img src={user.profilePicture} alt="DP" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center text-white">
+                    {user.name.charAt(0)}
+                  </div>
+                )}
               </div>
               <AnimatePresence>
                 {(!collapsed || isMobile) && (

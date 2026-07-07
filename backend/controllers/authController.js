@@ -324,18 +324,64 @@ export const firebaseSync = async (req, res) => {
     let user = await User.findOne({ email });
 
     if (!user) {
+      // Generate a unique referral code
+      const newReferralCode = 'CR' + Math.random().toString(36).substring(2, 8).toUpperCase();
+      
       // Create user if they don't exist
       user = await User.create({
         name: name || decodedToken.name || email.split('@')[0],
         email,
         password: 'firebase_managed_auth_' + Date.now(), // Dummy password since Firebase handles it
         role: role || 'Creator',
-        isVerified: true
+        isVerified: true,
+        referralCode: newReferralCode,
+        referredBy: req.body.referredBy || null
       });
-    } else if (!user.isVerified) {
-      // Mark as verified if they weren't
-      user.isVerified = true;
-      await User.findByIdAndUpdate(user._id || user.id, { isVerified: true });
+
+      // Handle Referral Reward Logic
+      if (req.body.referredBy) {
+        const referrer = await User.findOne({ referralCode: req.body.referredBy });
+        if (referrer) {
+          referrer.referralCount = (referrer.referralCount || 0) + 1;
+          
+          // Check if they reached a multiple of 10
+          if (referrer.referralCount > 0 && referrer.referralCount % 10 === 0) {
+            referrer.isPremium = true;
+            // Add 1 day to premium (or from now if not currently premium)
+            const currentExpiry = referrer.premiumExpires && referrer.premiumExpires > new Date() 
+              ? new Date(referrer.premiumExpires) 
+              : new Date();
+            currentExpiry.setDate(currentExpiry.getDate() + 1);
+            referrer.premiumExpires = currentExpiry;
+          }
+          
+          await User.findByIdAndUpdate(referrer._id || referrer.id, {
+            referralCount: referrer.referralCount,
+            isPremium: referrer.isPremium,
+            premiumExpires: referrer.premiumExpires
+          });
+        }
+      }
+    } else {
+      let needsUpdate = false;
+      const updateData = {};
+      
+      if (!user.isVerified) {
+        user.isVerified = true;
+        updateData.isVerified = true;
+        needsUpdate = true;
+      }
+      
+      if (!user.referralCode) {
+        const newReferralCode = 'CR' + Math.random().toString(36).substring(2, 8).toUpperCase();
+        user.referralCode = newReferralCode;
+        updateData.referralCode = newReferralCode;
+        needsUpdate = true;
+      }
+      
+      if (needsUpdate) {
+        await User.findByIdAndUpdate(user._id || user.id, updateData);
+      }
     }
 
     // Generate our JWT
@@ -755,7 +801,8 @@ export const updateProfile = async (req, res) => {
       instagramLink,
       tiktokLink,
       facebookLink,
-      facebookFollowers
+      facebookFollowers,
+      profilePicture
     } = req.body;
 
     const updatedUser = await User.findByIdAndUpdate(userId, {
