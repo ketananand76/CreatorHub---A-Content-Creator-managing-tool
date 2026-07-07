@@ -59,6 +59,62 @@ export default function SuperAdmin() {
   const [broadcastTitle, setBroadcastTitle] = useState('');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [broadcastHistory, setBroadcastHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  
+  const fetchBroadcastHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const res = await authFetch('/notifications/broadcasts');
+      const data = await res.json();
+      if (data.success) {
+        setBroadcastHistory(data.broadcasts);
+      }
+    } catch (err) {
+      console.error('Failed to fetch broadcasts', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'broadcast') {
+      fetchBroadcastHistory();
+    }
+  }, [activeTab]);
+
+  const handleDeleteBroadcast = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this broadcast?')) return;
+    try {
+      const res = await authFetch(`/notifications/broadcast/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        showNotification('Broadcast deleted successfully', 'success');
+        fetchBroadcastHistory();
+      } else {
+        showNotification(data.message || 'Failed to delete', 'error');
+      }
+    } catch (err) {
+      showNotification('Server error', 'error');
+    }
+  };
+
+  const handleRemindBroadcast = async (id) => {
+    if (!window.confirm('Send a reminder for this broadcast? This will bump it to the top.')) return;
+    try {
+      const res = await authFetch(`/notifications/broadcast/${id}/reminder`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showNotification('Reminder sent successfully', 'success');
+        fetchBroadcastHistory();
+      } else {
+        showNotification(data.message || 'Failed to send reminder', 'error');
+      }
+    } catch (err) {
+      showNotification('Server error', 'error');
+    }
+  };
 
   const fetchAdminData = async () => {
     try {
@@ -285,6 +341,7 @@ export default function SuperAdmin() {
         showNotification('System broadcast notice published successfully!', 'success');
         setBroadcastTitle('');
         setBroadcastMessage('');
+        fetchBroadcastHistory();
       } else {
         showNotification(data.message || 'Failed to send broadcast', 'error');
       }
