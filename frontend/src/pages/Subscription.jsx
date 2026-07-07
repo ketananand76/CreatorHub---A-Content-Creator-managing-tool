@@ -182,6 +182,25 @@ export default function Subscription() {
     }
   };
 
+  const handleGenerateInsight = async (e) => {
+    if (e) e.preventDefault();
+    setAiLoading(true);
+    setAiOutput('');
+    try {
+      const res = await authFetch('/ai/insight');
+      const data = await res.json();
+      if (data.success) {
+        setAiOutput(data.insight);
+      } else {
+        showNotification(data.message, 'error');
+      }
+    } catch (e) {
+      showNotification('AI Engine failed', 'error');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
       
@@ -339,11 +358,12 @@ export default function Subscription() {
             </div>
 
             {/* Sub toolkit selection */}
-            <div className="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+            <div className="grid grid-cols-4 gap-1.5 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
               {[
                 { id: 'caption', label: 'Caption' },
                 { id: 'script', label: 'Script' },
-                { id: 'viral', label: 'Viral' }
+                { id: 'viral', label: 'Viral' },
+                { id: 'insight', label: 'Insight' }
               ].map(t => (
                 <button
                   key={t.id}
@@ -404,7 +424,7 @@ export default function Subscription() {
                   disabled={aiLoading}
                   className="w-full py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold uppercase"
                 >
-                  {aiLoading ? 'Generating...' : 'Draft Caption'}
+                  {aiLoading ? 'Draft Caption' : 'Draft Caption'}
                 </button>
               </form>
             )}
@@ -451,7 +471,7 @@ export default function Subscription() {
                   disabled={aiLoading}
                   className="w-full py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold uppercase"
                 >
-                  {aiLoading ? 'Generating...' : 'Draft Script'}
+                  {aiLoading ? 'Generating...' : 'Draft Script Template'}
                 </button>
               </form>
             )}
@@ -478,6 +498,21 @@ export default function Subscription() {
                   {aiLoading ? 'Analyzing...' : 'Fetch Viral Ideas'}
                 </button>
               </form>
+            )}
+
+            {selectedAiTool === 'insight' && (
+              <div className="space-y-4">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Let AI analyze your active brand deals, team tasks, and content calendar to provide personalized growth strategies and workflow insights.
+                </p>
+                <button
+                  onClick={handleGenerateInsight}
+                  disabled={aiLoading}
+                  className="w-full py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold uppercase"
+                >
+                  {aiLoading ? 'Analyzing...' : 'Generate Performance Insight'}
+                </button>
+              </div>
             )}
           </div>
 

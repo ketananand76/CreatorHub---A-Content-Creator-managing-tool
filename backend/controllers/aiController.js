@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
+import { BrandDeal, TeamTask, CalendarEvent } from '../models/db.js';
 dotenv.config();
-
 // Helper to simulate Gemini or fallback generator
 const generateCaptionFallback = (platform, topic, tone) => {
   const hashtags = {
@@ -211,6 +211,63 @@ export const generateViralSuggestions = async (req, res) => {
     res.status(200).json({ success: true, suggestions });
   } catch (error) {
     console.error('AI Suggestions Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+export const getUserAIPerformanceInsight = async (req, res) => {
+  try {
+    const isAdmin = req.user.role === 'Admin' || req.user.role === 'Super Admin';
+    if (!req.user.isPremium && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'This is a premium feature. Please upgrade your subscription to unlock AI tools.'
+      });
+    }
+
+    const creatorId = req.user._id || req.user.id;
+    const deals = await BrandDeal.find({ creatorId });
+    const tasks = await TeamTask.find({ creatorId });
+    const events = await CalendarEvent.find({ creatorId });
+
+    const dealsValue = deals.reduce((sum, d) => sum + (Number(d.dealValue) || 0), 0);
+    const tasksCompleted = tasks.filter(t => t.status === 'completed').length;
+    
+    const prompt = `You are a CreatorHub AI Assistant.
+Analyze the following performance metrics for a creator:
+- Total Brand Deals: ${deals.length} (Total Value: ₹${dealsValue})
+- Team Tasks Completed: ${tasksCompleted} out of ${tasks.length}
+- Scheduled Content Events: ${events.length}
+
+Provide a short, motivating, and actionable 3-point markdown insight on how they can improve their content strategy and workflow.`;
+
+    let insightText = '';
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+          })
+        });
+        const data = await response.json();
+        if (data.candidates && data.candidates[0].content.parts[0].text) {
+          insightText = data.candidates[0].content.parts[0].text;
+        } else {
+          throw new Error('Invalid Gemini API response');
+        }
+      } catch (err) {
+        console.error('Gemini API call failed, using fallback:', err);
+        insightText = `### 🚀 Performance Insight\n\n1. **Focus on High-Value Deals**: You have ₹${dealsValue} in pipeline.\n2. **Stay on Top of Tasks**: Complete your remaining ${tasks.length - tasksCompleted} tasks.\n3. **Consistent Posting**: Keep up with your ${events.length} scheduled events!`;
+      }
+    } else {
+      insightText = `### 🚀 Performance Insight\n\n1. **Focus on High-Value Deals**: You have ₹${dealsValue} in pipeline.\n2. **Stay on Top of Tasks**: Complete your remaining ${tasks.length - tasksCompleted} tasks.\n3. **Consistent Posting**: Keep up with your ${events.length} scheduled events!`;
+    }
+
+    res.status(200).json({ success: true, insight: insightText });
+  } catch (error) {
+    console.error('AI Insight Error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
