@@ -14,22 +14,7 @@ export default function Register() {
   const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'Creator' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  
-  const [step, setStep] = useState(1); // 1 = Registration details, 2 = Email OTP verification
-  const [otp, setOtp] = useState('');
-  const [registrationToken, setRegistrationToken] = useState(null);
-  const [countdown, setCountdown] = useState(60);
-
-  // Timer for OTP Resend
-  React.useEffect(() => {
-    let timer;
-    if (step === 2 && countdown > 0) {
-      timer = setInterval(() => {
-        setCountdown((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [step, countdown]);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -43,36 +28,14 @@ export default function Register() {
       );
 
       if (data.success) {
-        setRegistrationToken(data.registrationToken);
-        setStep(2);
-        setCountdown(60); // Reset timer on successful send
-        showNotification(data.message || 'OTP sent to your email!', 'success');
+        setIsSuccess(true);
+        showNotification('Verification link sent to your email!', 'success');
       } else {
         showNotification(data.message || 'Registration failed', 'error');
       }
     } catch (err) {
       console.error(err);
       showNotification('Server error during registration.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOTP = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const data = await verifyOTP(formData.email, otp, registrationToken);
-
-      if (data.success) {
-        showNotification('Registration successful! Please login.', 'success');
-        navigate('/login');
-      } else {
-        showNotification(data.message || 'Invalid OTP', 'error');
-      }
-    } catch (err) {
-      console.error(err);
-      showNotification('Verification failed', 'error');
     } finally {
       setLoading(false);
     }
@@ -91,11 +54,11 @@ export default function Register() {
         <div className="flex flex-col items-center mb-8">
           <Logo size={42} showText={true} textClassName="text-3xl font-bold font-outfit text-gradient tracking-wide" />
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 text-center">
-            {step === 1 ? 'Register and coordinate your content campaigns' : 'Verify your email address'}
+            {isSuccess ? 'Check your email inbox' : 'Register and coordinate your content campaigns'}
           </p>
         </div>
 
-        {step === 1 ? (
+        {!isSuccess ? (
           <form onSubmit={handleRegister} className="space-y-5">
             {/* Name */}
             <div>
@@ -200,50 +163,24 @@ export default function Register() {
             </button>
           </form>
         ) : (
-          <form onSubmit={handleVerifyOTP} className="space-y-5">
-            <div>
-              <label className="block text-xs font-bold tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                <span className="uppercase">Enter OTP sent to</span> <span className="text-brand-500 font-semibold">{formData.email.toLowerCase()}</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="123456"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                className="w-full px-4 py-3 text-center tracking-widest text-lg rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-white"
-              />
+          <div className="py-8 text-center space-y-6">
+            <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto border border-emerald-500/20 shadow-lg shadow-emerald-500/10">
+              <Mail className="w-10 h-10 text-emerald-500" />
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-brand-500/20 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:pointer-events-none"
-            >
-              {loading ? 'Verifying...' : 'Verify & Complete'}
-            </button>
-            <div className="flex justify-between items-center text-sm mt-4">
+            <h3 className="text-2xl font-black font-outfit text-slate-800 dark:text-white">Verify your email</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
+              We've sent a verification link to <strong className="text-slate-700 dark:text-slate-300">{formData.email.toLowerCase()}</strong>. Please click the link to activate your account.
+            </p>
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
+              <p className="text-xs text-slate-400 mb-4">Didn't receive the email? Check your spam folder.</p>
               <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                onClick={() => setIsSuccess(false)}
+                className="text-brand-500 hover:text-brand-600 font-bold text-sm transition-colors"
               >
-                Back
+                Use a different email
               </button>
-              
-              {countdown > 0 ? (
-                <span className="text-slate-400">Resend OTP in {countdown}s</span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleRegister}
-                  disabled={loading}
-                  className="text-brand-500 hover:text-brand-600 font-semibold transition-colors"
-                >
-                  Resend OTP
-                </button>
-              )}
             </div>
-          </form>
+          </div>
         )}
 
         <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-6">

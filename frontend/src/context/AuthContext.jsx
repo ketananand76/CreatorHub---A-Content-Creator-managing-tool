@@ -271,6 +271,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const resetPassword = async (token, newPassword) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, newPassword })
+      });
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.error('Reset Password Error:', err);
+      return { success: false, message: err.message || 'Password reset request failed.' };
+    }
+  };
+
   const verifyEmailToken = async (token) => {
     try {
       const res = await fetch(`${API_BASE}/auth/verify-email`, {
@@ -385,6 +400,7 @@ export const AuthProvider = ({ children }) => {
       register,
       verifyOTP,
       forgotPassword,
+      resetPassword,
       verifyEmailToken,
       socialLogin,
       socialLoginSuccess,

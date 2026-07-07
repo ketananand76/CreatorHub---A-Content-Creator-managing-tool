@@ -1,7 +1,7 @@
 import express from 'express';
 import {
   register,
-  verifyOTP,
+  verifyEmail,
   login,
   socialLogin,
   refreshToken,
@@ -10,10 +10,8 @@ import {
   disable2FA,
   forgotPassword,
   resetPassword,
-  resendOTP,
   getProfile,
-  updateProfile,
-  verifyEmailLink
+  updateProfile
 } from '../controllers/authController.js';
 import { socialLoginByHandle } from '../controllers/socialController.js';
 import { protect } from '../middleware/authMiddleware.js';
@@ -21,9 +19,7 @@ import { protect } from '../middleware/authMiddleware.js';
 const router = express.Router();
 
 router.post('/register', register);
-router.post('/verify-otp', verifyOTP);
-router.post('/verify-email', verifyEmailLink);
-router.post('/resend-otp', resendOTP);
+router.post('/verify-email', verifyEmail);
 router.post('/login', login);
 // Removed verifyLogin route
 router.post('/social-login', socialLogin);

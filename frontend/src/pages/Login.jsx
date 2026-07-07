@@ -15,8 +15,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  const [step, setStep] = useState(1); // 1 = Login, 2 = Verify Email OTP
-  const [otp, setOtp] = useState('');
+  const [step, setStep] = useState(1); // 1 = Login, 2 = Verify Email Notice
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -43,25 +42,7 @@ export default function Login() {
     }
   };
 
-  const handleVerifyOTP = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const data = await verifyOTP(formData.email, otp);
-
-      if (data.success) {
-        showNotification('Login successful!', 'success');
-        navigate('/');
-      } else {
-        showNotification(data.message || 'Invalid OTP', 'error');
-      }
-    } catch (err) {
-      console.error(err);
-      showNotification('Verification failed', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Removed verify OTP logic
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-[#070b14] px-4 relative overflow-hidden">
@@ -139,35 +120,23 @@ export default function Login() {
             </button>
           </form>
         ) : (
-          <form onSubmit={handleVerifyOTP} className="space-y-5">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                Enter OTP sent to {formData.email}
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="123456"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                className="w-full px-4 py-3 text-center tracking-widest text-lg rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-white"
-              />
+          <div className="py-8 text-center space-y-6">
+            <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto border border-amber-500/20 shadow-lg shadow-amber-500/10">
+              <Mail className="w-10 h-10 text-amber-500" />
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-brand-500/20 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:pointer-events-none"
-            >
-              {loading ? 'Verifying...' : 'Verify & Login'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setStep(1)}
-              className="w-full py-3 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-            >
-              Back
-            </button>
-          </form>
+            <h3 className="text-2xl font-black font-outfit text-slate-800 dark:text-white">Verification Required</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
+              Your account hasn't been verified yet. We just sent a new verification link to <strong className="text-slate-700 dark:text-slate-300">{formData.email.toLowerCase()}</strong>.
+            </p>
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
+              <button
+                onClick={() => setStep(1)}
+                className="w-full py-3 text-sm font-semibold text-brand-500 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+              >
+                Back to Login
+              </button>
+            </div>
+          </div>
         )}
 
         <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-6">

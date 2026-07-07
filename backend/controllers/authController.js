@@ -209,25 +209,22 @@ export const register = async (req, res) => {
       userRole = 'Team Member';
     }
 
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
     // Create a temporary stateless JWT for registration details
     const registrationToken = jwt.sign(
-      { name, email: email.toLowerCase(), hashedPassword, role: userRole, otp },
+      { name, email: email.toLowerCase(), hashedPassword, role: userRole },
       JWT_SECRET,
-      { expiresIn: '10m' }
+      { expiresIn: '15m' }
     );
 
-    // Send the OTP email
-    await sendOTPEmail(email, otp);
+    // Send the verification link
+    const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${registrationToken}`;
+    await sendLinkEmail(email, verificationLink, 'verification');
 
     res.status(201).json({
       success: true,
       requiresVerification: true,
-      message: 'Registration initiated. An OTP has been sent to your email address.',
-      email: email.toLowerCase(),
-      registrationToken
+      message: 'Registration initiated. A verification link has been sent to your email address.',
+      email: email.toLowerCase()
     });
   } catch (error) {
     console.error('Registration Error:', error);
@@ -235,115 +232,56 @@ export const register = async (req, res) => {
   }
 };
 
-export const verifyOTP = async (req, res) => {
+export const verifyEmail = async (req, res) => {
   try {
-    const { email, otp, registrationToken } = req.body;
+    const { token } = req.body;
     
-    if (!email || !otp) {
-      return res.status(400).json({ success: false, message: 'Email and OTP are required' });
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Verification token is required.' });
     }
 
-    // If registrationToken is provided, this is a new stateless registration verification
-    if (registrationToken) {
-      try {
-        const decoded = jwt.verify(registrationToken, JWT_SECRET);
-        
-        if (decoded.email.toLowerCase() !== email.toLowerCase()) {
-          return res.status(400).json({ success: false, message: 'Email mismatch.' });
-        }
-        
-        if (decoded.otp !== otp) {
-          return res.status(400).json({ success: false, message: 'Invalid OTP.' });
-        }
-
-        const existingUser = await User.findOne({ email: decoded.email });
-        if (existingUser) {
-           return res.status(400).json({ success: false, message: 'User already exists and is verified.' });
-        }
-
-        // OTP is correct and token is valid. Now we create the user in the database!
-        const newUser = await User.create({
-          name: decoded.name,
-          email: decoded.email,
-          password: decoded.hashedPassword,
-          role: decoded.role,
-          isVerified: true,
-          status: 'active'
-        });
-
-        // Send Welcome Email asynchronously
-        sendWelcomeEmail(newUser.name, newUser.email).catch(console.error);
-
-        const { accessToken, refreshToken } = generateTokens(newUser);
-        return res.status(201).json({
-          success: true,
-          message: 'Account created and verified successfully!',
-          accessToken,
-          refreshToken,
-          user: {
-            id: newUser._id || newUser.id,
-            name: newUser.name,
-            email: newUser.email,
-            role: newUser.role,
-            isPremium: newUser.isPremium,
-            isTwoFAEnabled: newUser.isTwoFAEnabled
-          }
-        });
-
-      } catch (tokenErr) {
-        return res.status(400).json({ success: false, message: 'Registration session expired or invalid. Please try registering again.' });
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      
+      const existingUser = await User.findOne({ email: decoded.email });
+      if (existingUser) {
+         return res.status(400).json({ success: false, message: 'User already exists and is verified.' });
       }
+
+      // Token is valid. Create the user in the database
+      const newUser = await User.create({
+        name: decoded.name,
+        email: decoded.email,
+        password: decoded.hashedPassword,
+        role: decoded.role,
+        isVerified: true,
+        status: 'active'
+      });
+
+      // Send Welcome Email asynchronously
+      sendWelcomeEmail(newUser.name, newUser.email).catch(console.error);
+
+      const { accessToken, refreshToken } = generateTokens(newUser);
+      return res.status(201).json({
+        success: true,
+        message: 'Account verified and created successfully!',
+        accessToken,
+        refreshToken,
+        user: {
+          id: newUser._id || newUser.id,
+          name: newUser.name,
+          email: newUser.email,
+          role: newUser.role,
+          isPremium: newUser.isPremium,
+          isTwoFAEnabled: newUser.isTwoFAEnabled
+        }
+      });
+
+    } catch (tokenErr) {
+      return res.status(400).json({ success: false, message: 'Verification link expired or invalid. Please try registering again.' });
     }
-
-    // Fallback for legacy DB-based OTP verification (e.g. for Login OTP if unverified)
-    const user = await User.findOne({ email: email.toLowerCase() });
-
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User record not found.' });
-    }
-
-    if (user.isVerified) {
-      return res.status(400).json({ success: false, message: 'Account is already verified.' });
-    }
-
-    if (!user.otp || !user.otpExpires) {
-      return res.status(400).json({ success: false, message: 'No OTP found. Please request a new one.' });
-    }
-
-    if (new Date() > user.otpExpires) {
-      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new one.' });
-    }
-
-    if (user.otp !== otp) {
-      return res.status(400).json({ success: false, message: 'Invalid OTP.' });
-    }
-
-    // Verify user
-    user.isVerified = true;
-    user.otp = null;
-    user.otpExpires = null;
-    await user.save();
-
-    // Send Welcome Email asynchronously
-    sendWelcomeEmail(user.name, user.email).catch(console.error);
-
-    const { accessToken, refreshToken } = generateTokens(user);
-    res.status(200).json({
-      success: true,
-      message: 'Account verified successfully!',
-      accessToken,
-      refreshToken,
-      user: {
-        id: user._id || user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isPremium: user.isPremium,
-        isTwoFAEnabled: user.isTwoFAEnabled
-      }
-    });
   } catch (error) {
-    console.error('Verification Check Error:', error);
+    console.error('Email Verification Error:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };
@@ -418,17 +356,19 @@ export const login = async (req, res) => {
     }
 
     if (!user.isVerified && !isDirectAdminLogin) {
-      // User hasn't verified email yet, send another OTP
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      user.otp = otp;
-      user.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
-      await user.save();
-      await sendOTPEmail(user.email, otp);
+      // User hasn't verified email yet, send a verification link
+      const registrationToken = jwt.sign(
+        { name: user.name, email: user.email, hashedPassword: user.password, role: user.role },
+        JWT_SECRET,
+        { expiresIn: '15m' }
+      );
+      const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${registrationToken}`;
+      await sendLinkEmail(user.email, verificationLink, 'verification');
 
       return res.status(200).json({
         success: true,
         requiresVerification: true,
-        message: 'Account not verified. A new OTP has been sent to your email.'
+        message: 'Account not verified. A new verification link has been sent to your email.'
       });
     }
 
