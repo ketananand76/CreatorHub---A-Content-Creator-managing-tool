@@ -218,11 +218,13 @@ export const AuthProvider = ({ children }) => {
       }
 
       const idToken = await getIdToken(credential.user);
+      const pendingReferral = localStorage.getItem('pendingReferral');
       const res = await fetch(`${API_BASE}/auth/firebase-sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken, name: credential.user.displayName })
+        body: JSON.stringify({ idToken, name: credential.user.displayName, referredBy: pendingReferral })
       });
+      if (pendingReferral) localStorage.removeItem('pendingReferral');
       const data = await res.json();
       
       if (data.success) {

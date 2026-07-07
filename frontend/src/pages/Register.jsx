@@ -31,6 +31,9 @@ export default function Register() {
       );
 
       if (data.success) {
+        if (formData.referredBy) {
+          localStorage.setItem('pendingReferral', formData.referredBy);
+        }
         setIsSuccess(true);
         showNotification('Verification link sent to your email!', 'success');
       } else {
