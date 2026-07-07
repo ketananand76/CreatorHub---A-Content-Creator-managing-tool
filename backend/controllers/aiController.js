@@ -83,7 +83,8 @@ const generateViralSuggestionsFallback = (niche) => {
 // Main controllers
 export const generateCaption = async (req, res) => {
   try {
-    if (!req.user.isPremium) {
+    const isAdmin = req.user.role === 'Admin' || req.user.role === 'Super Admin';
+    if (!req.user.isPremium && !isAdmin) {
       return res.status(403).json({
         success: false,
         message: 'This is a premium feature. Please upgrade your subscription to unlock AI tools.'
@@ -127,7 +128,8 @@ export const generateCaption = async (req, res) => {
 
 export const generateScript = async (req, res) => {
   try {
-    if (!req.user.isPremium) {
+    const isAdmin = req.user.role === 'Admin' || req.user.role === 'Super Admin';
+    if (!req.user.isPremium && !isAdmin) {
       return res.status(403).json({
         success: false,
         message: 'This is a premium feature. Please upgrade your subscription to unlock AI tools.'
@@ -170,7 +172,8 @@ export const generateScript = async (req, res) => {
 
 export const generateViralSuggestions = async (req, res) => {
   try {
-    if (!req.user.isPremium) {
+    const isAdmin = req.user.role === 'Admin' || req.user.role === 'Super Admin';
+    if (!req.user.isPremium && !isAdmin) {
       return res.status(403).json({
         success: false,
         message: 'This is a premium feature. Please upgrade your subscription to unlock AI tools.'

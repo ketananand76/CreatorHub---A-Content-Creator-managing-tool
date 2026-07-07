@@ -54,7 +54,7 @@ export default function Sidebar({ mobileSidebarOpen, setMobileSidebarOpen }) {
     { path: '/earnings', label: 'Earnings Tracker', icon: DollarSign, roles: ['Creator'] },
     { path: '/team', label: 'Team Hub', icon: Users, roles: ['Creator', 'Team Member'] },
     { path: '/settings', label: 'Settings & Profile', icon: Settings, roles: ['Creator', 'Team Member'] },
-    { path: '/subscription', label: 'Premium Upgrades', icon: Award, roles: ['Creator'] },
+    { path: '/subscription', label: user.role === 'Admin' || user.role === 'Super Admin' ? 'AI Toolkit' : 'Premium Upgrades', icon: Award, roles: ['Creator', 'Admin', 'Super Admin'] },
     { path: '/admin', label: 'Admin Panel', icon: Shield, roles: ['Admin', 'Super Admin'] },
     { path: '/support', label: 'Help & Tickets', icon: LifeBuoy, roles: ['Creator', 'Team Member'] },
   ];

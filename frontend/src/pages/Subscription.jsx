@@ -63,10 +63,10 @@ export default function Subscription() {
 
   useEffect(() => {
     fetchTransactions();
-    if (user.isPremium) {
+    if (user.isPremium || user.role === 'Admin' || user.role === 'Super Admin') {
       setActiveTab('ai-toolkit');
     }
-  }, [user.isPremium]);
+  }, [user.isPremium, user.role]);
 
   const handleCopyUpi = () => {
     navigator.clipboard.writeText('9771735011@mbk');
@@ -315,7 +315,7 @@ export default function Subscription() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 relative">
           
           {/* Lock Cover if not Pro */}
-          {!user.isPremium && (
+          {(!user.isPremium && user.role !== 'Admin' && user.role !== 'Super Admin') && (
             <div className="absolute inset-0 bg-slate-100/70 dark:bg-slate-950/80 backdrop-blur-md z-10 flex flex-col items-center justify-center text-center p-8 rounded-3xl">
               <Lock className="w-12 h-12 text-yellow-500 mb-4" />
               <h3 className="text-lg font-bold text-slate-800 dark:text-white font-outfit">AI content tools locked</h3>
