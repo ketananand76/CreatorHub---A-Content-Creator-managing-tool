@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import Logo from './Logo';
-import AdSenseBanner from './AdSenseBanner';
+
 import {
   LayoutDashboard,
   Calendar,
@@ -167,7 +167,7 @@ export default function Sidebar({ mobileSidebarOpen, setMobileSidebarOpen }) {
           </button>
 
           {/* Ads only for free users */}
-          {(!collapsed || isMobile) && !user?.isPremium && <AdSenseBanner type="sidebar" />}
+          
 
           {/* User Card */}
           <div className="flex items-center justify-between">

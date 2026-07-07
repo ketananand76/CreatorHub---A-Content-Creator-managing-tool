@@ -191,73 +191,52 @@ export const AuthProvider = ({ children }) => {
   // ─────────────────────────────────────────────
 
   const login = async (identifier, password, isAdminLogin = false) => {
-    if (isAdminLogin) {
-      try {
-        const res = await fetch(`${API_BASE}/auth/admin-login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier, password, isAdminLogin })
-        });
-        const data = await res.json();
-        if (data.success) {
-          setUser(data.user);
-          setAccessToken(data.accessToken);
-          localStorage.setItem('user', JSON.stringify(data.user));
-          localStorage.setItem('refreshToken', data.refreshToken);
-        }
-        return data;
-      } catch (err) {
-        return { success: false, message: 'Admin login failed.' };
-      }
-    }
-
     try {
-      const credential = await firebaseSignInWithEmail(identifier, password);
-      if (!credential.user.emailVerified) {
-        return { success: false, requiresVerification: true, message: 'Email not verified. Please check your inbox for the verification link.' };
-      }
-
-      const idToken = await getIdToken(credential.user);
-      const pendingReferral = localStorage.getItem('pendingReferral');
-      const res = await fetch(`${API_BASE}/auth/firebase-sync`, {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken, name: credential.user.displayName, referredBy: pendingReferral })
+        body: JSON.stringify({ identifier, password, isAdminLogin })
       });
-      if (pendingReferral) localStorage.removeItem('pendingReferral');
       const data = await res.json();
-      
       if (data.success) {
         setUser(data.user);
         setAccessToken(data.accessToken);
         localStorage.setItem('user', JSON.stringify(data.user));
         localStorage.setItem('refreshToken', data.refreshToken);
+        
+        if (localStorage.getItem('pendingReferral')) {
+          localStorage.removeItem('pendingReferral');
+        }
       }
       return data;
     } catch (err) {
-      console.error('Firebase Login Error:', err);
-      let msg = 'Login failed. Please check your credentials.';
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        msg = 'Invalid email or password.';
-      }
-      return { success: false, message: msg };
+      return { success: false, message: 'Login failed due to server error.' };
     }
   };
 
-  const register = async (name, email, password, role = 'Creator') => {
+  const register = async (name, email, password, role = 'Creator', referredBy = '') => {
     try {
+      // 1. Create in Firebase for password reset functionality
       const credential = await firebaseCreateWithEmail(email, password);
-      
-      // Update Firebase Profile with the provided name
       if (name) {
         await firebaseUpdateProfile(credential.user, { displayName: name });
       }
 
-      // Backend sync not strictly required here if they must verify email first,
-      // but we can just tell them it's sent.
-      return { success: true, message: 'Verification email sent. Please check your inbox and verify your email before logging in.' };
+      // 2. Register native user in backend
+      const res = await fetch(`${API_BASE}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, referredBy })
+      });
+      const data = await res.json();
+      
+      if (!data.success) {
+        return { success: false, message: data.message || 'Backend registration failed' };
+      }
+
+      return { success: true, message: 'Registration successful! Verification email sent.' };
     } catch (err) {
-      console.error('Firebase Register Error:', err);
+      console.error('Register Error:', err);
       let msg = 'Registration failed. Please try again.';
       if (err.code === 'auth/email-already-in-use') msg = 'Email is already registered.';
       if (err.code === 'auth/weak-password') msg = 'Password is too weak. Please use at least 6 characters.';

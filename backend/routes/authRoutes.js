@@ -1,6 +1,7 @@
 import express from 'express';
 import {
-  adminLogin,
+  login,
+  register,
   firebaseSync,
   socialLogin,
   refreshToken,
@@ -15,7 +16,8 @@ import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.post('/admin-login', adminLogin);
+router.post('/login', login);
+router.post('/register', register);
 router.post('/firebase-sync', firebaseSync);
 router.post('/social-login', socialLogin);
 router.post('/social-login-handle', socialLoginByHandle);

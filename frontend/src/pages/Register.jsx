@@ -27,7 +27,8 @@ export default function Register() {
         formData.name,
         formData.email,
         formData.password,
-        formData.role
+        formData.role,
+        formData.referredBy
       );
 
       if (data.success) {

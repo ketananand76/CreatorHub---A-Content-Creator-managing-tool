@@ -184,7 +184,69 @@ const sendRealEmail = async (to, subject, html) => {
   }
 };
 
-export const adminLogin = async (req, res) => {
+export const register = async (req, res) => {
+  try {
+    const { name, email, password, referredBy } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+
+    const query = email.toLowerCase();
+    let existing = await User.findOne({ email: query });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'User already exists' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    const newReferralCode = 'CR' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    
+    const verificationToken = Array.from({ length: 32 }, () => Math.random().toString(36)[2] || '0').join('');
+
+    const user = await User.create({
+      name,
+      email: query,
+      password: hashedPassword,
+      role: 'Creator',
+      isVerified: false,
+      verificationToken,
+      referralCode: newReferralCode,
+      referredBy: referredBy || null,
+      status: 'active'
+    });
+
+    if (referredBy) {
+      const referrer = await User.findOne({ referralCode: referredBy });
+      if (referrer) {
+        referrer.referralCount = (referrer.referralCount || 0) + 1;
+        if (referrer.referralCount > 0 && referrer.referralCount % 10 === 0) {
+          referrer.isPremium = true;
+          const currentExpiry = referrer.premiumExpires && referrer.premiumExpires > new Date() 
+            ? new Date(referrer.premiumExpires) 
+            : new Date();
+          currentExpiry.setDate(currentExpiry.getDate() + 1);
+          referrer.premiumExpires = currentExpiry;
+        }
+        await User.findByIdAndUpdate(referrer._id || referrer.id, {
+          referralCount: referrer.referralCount,
+          isPremium: referrer.isPremium,
+          premiumExpires: referrer.premiumExpires
+        });
+      }
+    }
+
+    const frontendUrl = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:5173';
+    const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}`;
+    sendLinkEmail(query, verificationLink, 'verification').catch(console.error);
+
+    res.status(201).json({ success: true, message: 'Registration successful. Please verify your email.' });
+  } catch (err) {
+    console.error('Register error:', err);
+    res.status(500).json({ success: false, message: 'Server error during registration' });
+  }
+};
+
+export const login = async (req, res) => {
   try {
     const { identifier, password: providedPassword, isAdminLogin } = req.body;
 
