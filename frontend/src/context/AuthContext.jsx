@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }) => {
         const storedUser = localStorage.getItem('user');
         const storedRefreshToken = localStorage.getItem('refreshToken');
 
-        if (storedUser && storedRefreshToken) {
+        if (storedUser && storedUser !== 'undefined' && storedRefreshToken && storedRefreshToken !== 'undefined') {
           try {
             const parsedUser = JSON.parse(storedUser);
             setUser(parsedUser);
@@ -331,7 +331,7 @@ export const AuthProvider = ({ children }) => {
   const syncUser = async () => {
     try {
       const storedUser = localStorage.getItem('user');
-      if (storedUser) setUser(JSON.parse(storedUser));
+      if (storedUser && storedUser !== 'undefined') setUser(JSON.parse(storedUser));
     } catch (e) {
       console.error('Error syncing profile:', e);
     }
