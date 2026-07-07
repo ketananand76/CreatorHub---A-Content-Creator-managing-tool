@@ -1,4 +1,5 @@
 import { User, Transaction, SessionLog, Ticket, IncomeExpense, SystemSettings, BrandDeal, TeamTask, CalendarEvent, Notification } from '../models/db.js';
+import { deleteUserFromFirebase } from '../utils/firebaseAdmin.js';
 
 // --- USER-FACING ENDPOINTS ---
 
@@ -236,10 +237,19 @@ export const updateUserRole = async (req, res) => {
 export const deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
-    const deleted = await User.deleteOne({ _id: userId });
-    if (deleted.deletedCount === 0) {
+    
+    // First find the user to get their email
+    const user = await User.findById(userId);
+    if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    
+    // Delete from system DB
+    await User.deleteOne({ _id: userId });
+    
+    // Attempt to delete from Firebase
+    await deleteUserFromFirebase(user.email);
+    
     res.status(200).json({ success: true, message: 'User deleted successfully' });
   } catch (error) {
     console.error('Delete User Error:', error);
